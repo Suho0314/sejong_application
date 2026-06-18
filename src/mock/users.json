@@ -1,0 +1,123 @@
+[
+  {
+    "id": "user-admin-1",
+    "name": "관리자",
+    "email": "admin@sejong.test",
+    "passwordHash": "$mock$admin",
+    "role": "admin",
+    "status": "active",
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-06-01T00:00:00.000Z",
+    "deletedAt": null
+  },
+  {
+    "id": "user-teacher-1",
+    "name": "한수진",
+    "email": "sujin.han@sejong.test",
+    "passwordHash": "$mock$teacher1",
+    "role": "teacher",
+    "status": "active",
+    "createdAt": "2026-01-05T00:00:00.000Z",
+    "updatedAt": "2026-06-01T00:00:00.000Z",
+    "deletedAt": null
+  },
+  {
+    "id": "user-teacher-2",
+    "name": "이도윤",
+    "email": "doyoon.lee@sejong.test",
+    "passwordHash": "$mock$teacher2",
+    "role": "teacher",
+    "status": "active",
+    "createdAt": "2026-01-05T00:10:00.000Z",
+    "updatedAt": "2026-06-01T00:00:00.000Z",
+    "deletedAt": null
+  },
+  {
+    "id": "user-student-1",
+    "name": "김민지",
+    "email": "minji.kim@student.test",
+    "passwordHash": "$mock$student1",
+    "role": "student",
+    "status": "active",
+    "createdAt": "2026-03-02T01:00:00.000Z",
+    "updatedAt": "2026-06-15T02:00:00.000Z",
+    "deletedAt": null
+  },
+  {
+    "id": "user-student-2",
+    "name": "박서연",
+    "email": "seoyeon.park@student.test",
+    "passwordHash": "$mock$student2",
+    "role": "student",
+    "status": "active",
+    "createdAt": "2026-03-02T01:10:00.000Z",
+    "updatedAt": "2026-06-16T00:20:00.000Z",
+    "deletedAt": null
+  },
+  {
+    "id": "user-student-3",
+    "name": "오지훈",
+    "email": "jihoon.oh@student.test",
+    "passwordHash": "$mock$student3",
+    "role": "student",
+    "status": "active",
+    "createdAt": "2026-03-02T01:20:00.000Z",
+    "updatedAt": "2026-06-17T23:44:00.000Z",
+    "deletedAt": null
+  },
+  {
+    "id": "user-student-4",
+    "name": "최유진",
+    "email": "yujin.choi@student.test",
+    "passwordHash": "$mock$student4",
+    "role": "student",
+    "status": "active",
+    "createdAt": "2026-05-20T04:00:00.000Z",
+    "updatedAt": "2026-06-16T11:21:00.000Z",
+    "deletedAt": null
+  },
+  {
+    "id": "user-student-5",
+    "name": "정다은",
+    "email": "daeun.jung@student.test",
+    "passwordHash": "$mock$student5",
+    "role": "student",
+    "status": "active",
+    "createdAt": "2026-05-20T04:10:00.000Z",
+    "updatedAt": "2026-06-18T02:40:00.000Z",
+    "deletedAt": null
+  },
+  {
+    "id": "user-student-6",
+    "name": "문태영",
+    "email": "taeyoung.moon@student.test",
+    "passwordHash": "$mock$student6",
+    "role": "student",
+    "status": "inactive",
+    "createdAt": "2026-05-20T04:20:00.000Z",
+    "updatedAt": "2026-05-20T04:20:00.000Z",
+    "deletedAt": null
+  },
+  {
+    "id": "user-student-7",
+    "name": "한지우",
+    "email": "jiwoo.han@student.test",
+    "passwordHash": "$mock$student7",
+    "role": "student",
+    "status": "active",
+    "createdAt": "2025-09-01T00:00:00.000Z",
+    "updatedAt": "2026-02-27T09:00:00.000Z",
+    "deletedAt": null
+  },
+  {
+    "id": "user-student-8",
+    "name": "송예린",
+    "email": "yerin.song@student.test",
+    "passwordHash": "$mock$student8",
+    "role": "student",
+    "status": "active",
+    "createdAt": "2025-09-01T00:10:00.000Z",
+    "updatedAt": "2026-02-27T09:10:00.000Z",
+    "deletedAt": null
+  }
+]
