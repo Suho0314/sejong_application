@@ -360,6 +360,65 @@ th {
   outline: 3px solid rgba(37, 99, 235, 0.14);
 }
 
+.cohort-form {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.cohort-form label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.cohort-form label span {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.cohort-form input,
+.cohort-form select,
+.cohort-form textarea,
+.search-field select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+  padding: 10px 12px;
+}
+
+.cohort-form textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.cohort-form input:focus,
+.cohort-form select:focus,
+.cohort-form textarea:focus,
+.search-field select:focus {
+  border-color: #2563eb;
+  outline: 3px solid rgba(37, 99, 235, 0.14);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+}
+
 .table-title {
   font-weight: 800;
 }
@@ -567,6 +626,14 @@ th {
 
   .search-field {
     max-width: none;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
   }
 
   .workbook-question,
