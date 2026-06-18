@@ -6,6 +6,7 @@ const menuItems = [
   { label: '학생관리', to: '/admin/students' },
   { label: '문제관리', to: '/admin/questions' },
   { label: '문제집관리', to: '/admin/workbooks' },
+  { label: '문제집배포', to: '/admin/workbook-assignments' },
   { label: '성적분석', to: '/admin/scores' },
   { label: '설정', to: '/admin/settings' },
 ];

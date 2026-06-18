@@ -7,6 +7,7 @@ import { QuestionPage } from './pages/admin/question';
 import { ScorePage } from './pages/admin/score';
 import { SettingsPage } from './pages/admin/settings';
 import { StudentPage } from './pages/admin/student';
+import { WorkbookAssignmentPage } from './pages/admin/workbook-assignment';
 import { WorkbookPage } from './pages/admin/workbook';
 
 export const router = createBrowserRouter([
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
       { path: 'students', element: <StudentPage /> },
       { path: 'questions', element: <QuestionPage /> },
       { path: 'workbooks', element: <WorkbookPage /> },
+      { path: 'workbook-assignments', element: <WorkbookAssignmentPage /> },
       { path: 'scores', element: <ScorePage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],
