@@ -46,10 +46,14 @@ export type Student = {
   id: string;
   userId: string;
   cohortId: string;
+  name?: string;
+  email?: string;
   phone?: string;
   birthDate?: string;
+  studentNo?: string;
   status: StudentStatus;
   enrolledAt: string;
+  enrolledOn?: string;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
