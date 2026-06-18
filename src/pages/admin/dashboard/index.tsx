@@ -10,6 +10,7 @@ type Assignment = {
   status: string;
   opensAt: string | null;
   closesAt: string | null;
+  createdAt: string;
   submissionCount: number;
 };
 
@@ -23,6 +24,19 @@ type Submission = {
   correctCount: number;
   wrongCount: number;
   submittedAt: string | null;
+};
+
+type DashboardAssignment = Assignment & {
+  workbookTitle: string;
+  questionCount: number;
+  totalPoints: number;
+  cohortName: string;
+};
+
+type DashboardSubmission = Submission & {
+  workbookTitle: string;
+  cohortName: string;
+  studentName: string;
 };
 
 const formatDateTime = (value: string | null) => {
@@ -51,20 +65,21 @@ const getStatusLabel = (status: string) => {
 };
 
 export function DashboardPage() {
-  const assignments = workbooks.flatMap((workbook) =>
-    workbook.assignments.map((assignment) => ({
-      ...assignment,
-      workbookTitle: workbook.title,
-      questionCount: workbook.questionCount,
-      totalPoints: workbook.totalPoints,
-      cohortName: cohorts.find((cohort) => cohort.id === assignment.cohortId)?.name ?? '-',
-    })),
-  ) as Array<Assignment & {
-    workbookTitle: string;
-    questionCount: number;
-    totalPoints: number;
-    cohortName: string;
-  }>;
+  const assignments = workbooks
+    .flatMap((workbook) =>
+      workbook.assignments.map((assignment) => ({
+        ...assignment,
+        workbookTitle: workbook.title,
+        questionCount: workbook.questionCount,
+        totalPoints: workbook.totalPoints,
+        cohortName: cohorts.find((cohort) => cohort.id === assignment.cohortId)?.name ?? '-',
+      })),
+    )
+    .sort((a, b) => {
+      const aTime = new Date(a.opensAt ?? a.createdAt).getTime();
+      const bTime = new Date(b.opensAt ?? b.createdAt).getTime();
+      return bTime - aTime;
+    }) as DashboardAssignment[];
 
   const submissions = (scores.submissions as Submission[])
     .map((submission) => {
@@ -82,18 +97,24 @@ export function DashboardPage() {
       const aTime = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
       const bTime = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
       return bTime - aTime;
-    });
+    }) as DashboardSubmission[];
+
+  const gradedSubmissions = submissions.filter((submission) => submission.status === 'graded');
 
   const averageScore =
-    submissions.length > 0
-      ? Math.round((submissions.reduce((sum, item) => sum + item.score, 0) / submissions.length) * 10) / 10
+    gradedSubmissions.length > 0
+      ? Math.round((gradedSubmissions.reduce((sum, item) => sum + item.score, 0) / gradedSubmissions.length) * 10) /
+        10
       : 0;
+
+  const recentAssignments = assignments.slice(0, 5);
+  const recentSubmissions = submissions.slice(0, 6);
 
   const stats = [
     { label: '학생수', value: students.length.toLocaleString('ko-KR'), note: '전체 등록 학생' },
     { label: '기수수', value: cohorts.length.toLocaleString('ko-KR'), note: '전체 기수' },
     { label: '문제집수', value: workbooks.length.toLocaleString('ko-KR'), note: '생성된 문제집' },
-    { label: '평균점수', value: `${averageScore}점`, note: '제출 기준 평균' },
+    { label: '평균점수', value: `${averageScore}점`, note: '채점 완료 기준 평균' },
   ];
 
   return (
@@ -138,7 +159,7 @@ export function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {assignments.map((assignment) => (
+                {recentAssignments.map((assignment) => (
                   <tr key={assignment.id}>
                     <td>{assignment.workbookTitle}</td>
                     <td>{assignment.cohortName}</td>
@@ -160,22 +181,23 @@ export function DashboardPage() {
         <article className="dashboard-panel">
           <div className="panel-header">
             <div>
-              <h2>최근 시험</h2>
-              <p>최근 제출된 시험 결과</p>
+              <h2>최근 성적</h2>
+              <p>최근 제출/시험 결과</p>
             </div>
           </div>
 
           <div className="exam-list">
-            {submissions.map((submission) => (
+            {recentSubmissions.map((submission) => (
               <div className="exam-item" key={submission.id}>
                 <div>
                   <strong>{submission.workbookTitle}</strong>
                   <p>
-                    {submission.studentName} · {submission.cohortName} · {submission.attemptNo}회차
+                    {submission.studentName} · {submission.cohortName} · {submission.attemptNo}회차 ·{' '}
+                    {getStatusLabel(submission.status)}
                   </p>
                 </div>
                 <div className="exam-score">
-                  <strong>{submission.score}점</strong>
+                  <strong>{submission.status === 'graded' ? `${submission.score}점` : '채점대기'}</strong>
                   <span>{formatDateTime(submission.submittedAt)}</span>
                 </div>
               </div>
