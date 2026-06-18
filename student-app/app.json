@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "간호문제 학생앱",
+    "slug": "nursing-student-app",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#20C9C3"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
