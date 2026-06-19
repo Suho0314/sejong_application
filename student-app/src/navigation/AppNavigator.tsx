@@ -1,11 +1,9 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { HomeScreen } from '../screens/HomeScreen';
+import { CohortSelectScreen } from '../screens/CohortSelectScreen';
 import { LoginScreen } from '../screens/LoginScreen';
-import { ResultScreen } from '../screens/ResultScreen';
-import { WorkbookListScreen } from '../screens/WorkbookListScreen';
-import { WorkbookSolveScreen } from '../screens/WorkbookSolveScreen';
+import { MainScreen } from '../screens/MainScreen';
 import type { RootStackParamList } from '../types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -24,10 +22,12 @@ export function AppNavigator() {
         }}
       >
         <Stack.Screen name="Login" component={LoginScreen} options={{ title: '로그인' }} />
-        <Stack.Screen name="Home" component={HomeScreen} options={{ title: '홈' }} />
-        <Stack.Screen name="WorkbookList" component={WorkbookListScreen} options={{ title: '문제집' }} />
-        <Stack.Screen name="WorkbookSolve" component={WorkbookSolveScreen} options={{ title: '문제 풀이' }} />
-        <Stack.Screen name="Result" component={ResultScreen} options={{ title: '결과 확인' }} />
+        <Stack.Screen
+          name="CohortSelect"
+          component={CohortSelectScreen}
+          options={{ title: '기수 선택' }}
+        />
+        <Stack.Screen name="Main" component={MainScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

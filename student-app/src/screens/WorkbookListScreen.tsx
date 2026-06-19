@@ -1,65 +1,78 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Screen } from '../components/Screen';
-import { mockWorkbooks } from '../mock/workbooks';
-import type { ScreenProps } from '../types/navigation';
+import { WorkbookCard } from '../components/WorkbookCard';
+import type { Cohort, Workbook } from '../types/student';
 
-export function WorkbookListScreen({ navigation }: ScreenProps<'WorkbookList'>) {
+type WorkbookListScreenProps = {
+  cohort: Cohort;
+  workbooks: Workbook[];
+};
+
+export function WorkbookListScreen({ cohort, workbooks }: WorkbookListScreenProps) {
   return (
-    <Screen>
-      <Text style={styles.title}>문제집 목록</Text>
-      <Text style={styles.description}>실제 문제집 데이터 연결 전 최소 mock 데이터 1건만 표시합니다.</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.noticeCard}>
+        <Text style={styles.noticeTitle}>{cohort.name}</Text>
+        <Text style={styles.noticeDescription}>총 {workbooks.length}권의 문제집이 배포되었습니다.</Text>
+      </View>
 
-      {mockWorkbooks.map((workbook) => (
-        <Pressable
-          key={workbook.id}
-          style={styles.card}
-          onPress={() => navigation.navigate('WorkbookSolve', { workbookId: workbook.id })}
-        >
-          <View>
-            <Text style={styles.cardTitle}>{workbook.title}</Text>
-            <Text style={styles.meta}>
-              챕터 {workbook.chapterCount} · 문제 {workbook.questionCount}
-            </Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </Pressable>
+      <View style={styles.filterRow}>
+        <Text style={[styles.filterChip, styles.activeChip]}>전체</Text>
+        <Text style={styles.filterChip}>풀이 중</Text>
+        <Text style={styles.filterChip}>완료</Text>
+      </View>
+
+      {workbooks.map((workbook) => (
+        <WorkbookCard key={workbook.id} workbook={workbook} />
       ))}
-    </Screen>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  title: {
-    marginBottom: 8,
-    color: '#17183B',
-    fontSize: 26,
-    fontWeight: '800',
+  container: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
   },
-  description: {
-    marginBottom: 18,
-    color: '#7D8494',
-    lineHeight: 20,
+  content: {
+    padding: 16,
+    paddingBottom: 24,
   },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  noticeCard: {
+    marginBottom: 14,
     padding: 18,
-    borderRadius: 16,
+    borderRadius: 20,
     backgroundColor: '#FFFFFF',
   },
-  cardTitle: {
-    color: '#17183B',
-    fontSize: 18,
-    fontWeight: '700',
+  noticeTitle: {
+    color: '#172554',
+    fontSize: 17,
+    fontWeight: '900',
   },
-  meta: {
+  noticeDescription: {
     marginTop: 6,
-    color: '#7D8494',
+    color: '#64748B',
+    fontSize: 13,
   },
-  chevron: {
-    color: '#A1A7B3',
-    fontSize: 30,
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 999,
+    color: '#334155',
+    backgroundColor: '#FFFFFF',
+    fontWeight: '800',
+  },
+  activeChip: {
+    color: '#FFFFFF',
+    borderColor: '#2563EB',
+    backgroundColor: '#2563EB',
   },
 });
