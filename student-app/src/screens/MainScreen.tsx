@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppHeader } from '../components/AppHeader';
@@ -22,7 +22,13 @@ const tabTitle: Record<MainTab, string> = {
 };
 
 export function MainScreen({ navigation, route }: ScreenProps<'Main'>) {
-  const [activeTab, setActiveTab] = useState<MainTab>('workbooks');
+  const [activeTab, setActiveTab] = useState<MainTab>(route.params.initialTab ?? 'workbooks');
+
+  useEffect(() => {
+    if (route.params.initialTab) {
+      setActiveTab(route.params.initialTab);
+    }
+  }, [route.params.initialTab]);
 
   const cohort = useMemo(
     () => mockCohorts.find((item) => item.id === route.params.cohortId) ?? mockCohorts[0],

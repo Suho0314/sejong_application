@@ -45,6 +45,28 @@ export type StudentAnswer = {
   selectedChoiceId: string;
 };
 
+export type GradedAnswer = {
+  questionId: string;
+  questionContent: string;
+  selectedChoiceId?: string;
+  selectedChoiceText: string;
+  correctChoiceId: string;
+  correctChoiceText: string;
+  isCorrect: boolean;
+};
+
+export type SubmissionResult = {
+  workbookId: string;
+  workbookTitle: string;
+  cohortId: string;
+  totalQuestions: number;
+  correctCount: number;
+  wrongCount: number;
+  correctRate: number;
+  score: number;
+  gradedAnswers: GradedAnswer[];
+};
+
 export type WorkbookResult = {
   id: string;
   workbookId: string;

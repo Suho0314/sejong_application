@@ -6,6 +6,7 @@ import { QuestionCard } from '../components/QuestionCard';
 import { mockWorkbooks } from '../mock/studentMockData';
 import type { ScreenProps } from '../types/navigation';
 import type { StudentAnswer } from '../types/student';
+import { gradeWorkbook } from '../utils/gradeWorkbook';
 
 export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'WorkbookSolve'>) {
   const workbook = mockWorkbooks.find((item) => item.id === route.params.workbookId);
@@ -34,10 +35,9 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
   };
 
   const submit = () => {
-    navigation.replace('SubmissionResult', {
-      workbookId: workbook.id,
-      answeredCount: answers.length,
-    });
+    const result = gradeWorkbook(workbook, answers);
+
+    navigation.replace('Result', { result });
   };
 
   return (

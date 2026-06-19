@@ -1,10 +1,12 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { MainTab, SubmissionResult } from './student';
 
 export type RootStackParamList = {
   Login: undefined;
   CohortSelect: undefined;
   Main: {
     cohortId: string;
+    initialTab?: MainTab;
   };
   WorkbookDetail: {
     workbookId: string;
@@ -12,9 +14,8 @@ export type RootStackParamList = {
   WorkbookSolve: {
     workbookId: string;
   };
-  SubmissionResult: {
-    workbookId: string;
-    answeredCount: number;
+  Result: {
+    result: SubmissionResult;
   };
 };
 
