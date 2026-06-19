@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { WrongAnswerCard } from '../components/WrongAnswerCard';
 import { WrongAnswerSummaryCard } from '../components/WrongAnswerSummaryCard';
 import { useSubmissionHistory } from '../state/SubmissionHistoryContext';
+import { buildWrongAnswerHistory } from '../utils/wrongAnswerHistory';
 
 type WrongAnswerScreenProps = {
   cohortId: string;
@@ -10,9 +11,7 @@ type WrongAnswerScreenProps = {
 
 export function WrongAnswerScreen({ cohortId }: WrongAnswerScreenProps) {
   const { submissions } = useSubmissionHistory();
-  const wrongSubmissions = submissions.filter(
-    (submission) => submission.result.cohortId === cohortId && submission.result.wrongCount > 0,
-  );
+  const wrongAnswerHistory = buildWrongAnswerHistory(submissions, cohortId);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -23,7 +22,7 @@ export function WrongAnswerScreen({ cohortId }: WrongAnswerScreenProps) {
         </Text>
       </View>
 
-      {wrongSubmissions.length === 0 ? (
+      {wrongAnswerHistory.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyIcon}>✓</Text>
           <Text style={styles.emptyTitle}>정리할 오답이 없습니다</Text>
@@ -33,22 +32,16 @@ export function WrongAnswerScreen({ cohortId }: WrongAnswerScreenProps) {
         </View>
       ) : (
         <View style={styles.historyList}>
-          {wrongSubmissions.map((submission) => {
-            const wrongAnswers = submission.result.gradedAnswers.filter(
-              (answer) => !answer.isCorrect,
-            );
-
-            return (
-              <View key={submission.id} style={styles.historyGroup}>
-                <WrongAnswerSummaryCard submission={submission} />
+          {wrongAnswerHistory.map((history) => (
+              <View key={history.workbookId} style={styles.historyGroup}>
+                <WrongAnswerSummaryCard history={history} />
                 <View style={styles.answerList}>
-                  {wrongAnswers.map((answer, index) => (
+                  {history.wrongAnswers.map((answer, index) => (
                     <WrongAnswerCard key={answer.questionId} answer={answer} index={index} />
                   ))}
                 </View>
               </View>
-            );
-          })}
+          ))}
         </View>
       )}
     </ScrollView>

@@ -7,6 +7,7 @@ export type RootStackParamList = {
   Main: {
     cohortId: string;
     initialTab?: MainTab;
+    tabRequestKey?: number;
   };
   WorkbookDetail: {
     workbookId: string;
@@ -14,9 +15,7 @@ export type RootStackParamList = {
   WorkbookSolve: {
     workbookId: string;
   };
-  Result: {
-    result: SubmissionResult;
-  };
+  Result: { result?: SubmissionResult } | undefined;
 };
 
 export type ScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<

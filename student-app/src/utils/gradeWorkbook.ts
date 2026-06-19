@@ -14,6 +14,7 @@ export function gradeWorkbook(
     return {
       questionId: question.id,
       questionContent: question.content,
+      choices: question.choices,
       selectedChoiceId: selectedChoice?.id,
       selectedChoiceText: selectedChoice?.text ?? '미응답',
       correctChoiceId: correctChoice.id,

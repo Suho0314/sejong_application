@@ -1,19 +1,59 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { WorkbookCard } from '../components/WorkbookCard';
 import type { Cohort, Workbook } from '../types/student';
 
+type WorkbookListItem = Workbook & {
+  progressRate: number;
+};
+
 type WorkbookListScreenProps = {
   cohort: Cohort;
-  workbooks: Workbook[];
+  workbooks: WorkbookListItem[];
   onWorkbookPress: (workbookId: string) => void;
 };
+
+type WorkbookFilter = 'all' | 'active' | 'submitted';
+
+const filterOptions: { id: WorkbookFilter; label: string }[] = [
+  { id: 'all', label: '전체' },
+  { id: 'active', label: '풀이 중' },
+  { id: 'submitted', label: '완료' },
+];
 
 export function WorkbookListScreen({
   cohort,
   workbooks,
   onWorkbookPress,
 }: WorkbookListScreenProps) {
+  const [activeFilter, setActiveFilter] = useState<WorkbookFilter>('all');
+  const [activeSubject, setActiveSubject] = useState<string>('all');
+  const subjects = useMemo(
+    () => Array.from(new Set(workbooks.map((workbook) => workbook.subject))),
+    [workbooks],
+  );
+
+  useEffect(() => {
+    setActiveFilter('all');
+    setActiveSubject('all');
+  }, [cohort.id]);
+
+  const filteredWorkbooks = workbooks.filter((workbook) => {
+    const matchesSubject = activeSubject === 'all' || workbook.subject === activeSubject;
+
+    if (activeFilter === 'active') {
+      return matchesSubject
+        && (workbook.status === 'inProgress' || workbook.status === 'retrying');
+    }
+
+    if (activeFilter === 'submitted') {
+      return matchesSubject && workbook.status === 'submitted';
+    }
+
+    return matchesSubject;
+  });
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.noticeCard}>
@@ -22,18 +62,63 @@ export function WorkbookListScreen({
       </View>
 
       <View style={styles.filterRow}>
-        <Text style={[styles.filterChip, styles.activeChip]}>전체</Text>
-        <Text style={styles.filterChip}>풀이 중</Text>
-        <Text style={styles.filterChip}>완료</Text>
+        {filterOptions.map((option) => {
+          const selected = activeFilter === option.id;
+
+          return (
+            <Pressable
+              key={option.id}
+              style={[styles.filterChip, selected && styles.activeChip]}
+              onPress={() => setActiveFilter(option.id)}
+            >
+              <Text style={[styles.filterText, selected && styles.activeFilterText]}>
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
-      {workbooks.map((workbook) => (
-        <WorkbookCard
-          key={workbook.id}
-          workbook={workbook}
-          onPress={() => onWorkbookPress(workbook.id)}
-        />
-      ))}
+      <View style={styles.subjectSection}>
+        <Text style={styles.subjectLabel}>과목별 보기</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.subjectRow}
+        >
+          {['all', ...subjects].map((subject) => {
+            const selected = activeSubject === subject;
+
+            return (
+              <Pressable
+                key={subject}
+                style={[styles.subjectChip, selected && styles.activeSubjectChip]}
+                onPress={() => setActiveSubject(subject)}
+              >
+                <Text style={[styles.subjectText, selected && styles.activeSubjectText]}>
+                  {subject === 'all' ? '전체 과목' : subject}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {filteredWorkbooks.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>해당하는 문제집이 없습니다</Text>
+          <Text style={styles.emptyDescription}>다른 필터를 선택해 확인해 주세요.</Text>
+        </View>
+      ) : (
+        filteredWorkbooks.map((workbook) => (
+          <WorkbookCard
+            key={workbook.id}
+            workbook={workbook}
+            progressRate={workbook.progressRate}
+            onPress={() => onWorkbookPress(workbook.id)}
+          />
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -71,17 +156,70 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: 16,
     paddingVertical: 9,
-    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 999,
-    color: '#334155',
     backgroundColor: '#FFFFFF',
-    fontWeight: '800',
   },
   activeChip: {
-    color: '#FFFFFF',
     borderColor: '#2563EB',
     backgroundColor: '#2563EB',
+  },
+  filterText: {
+    color: '#334155',
+    fontWeight: '800',
+  },
+  activeFilterText: {
+    color: '#FFFFFF',
+  },
+  subjectSection: {
+    marginBottom: 16,
+  },
+  subjectLabel: {
+    marginBottom: 9,
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  subjectRow: {
+    gap: 8,
+    paddingRight: 16,
+  },
+  subjectChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#DCE3EC',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  activeSubjectChip: {
+    borderColor: '#93C5FD',
+    backgroundColor: '#EFF6FF',
+  },
+  subjectText: {
+    color: '#475569',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  activeSubjectText: {
+    color: '#1D4ED8',
+    fontWeight: '900',
+  },
+  emptyCard: {
+    alignItems: 'center',
+    padding: 28,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+  },
+  emptyTitle: {
+    color: '#172554',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  emptyDescription: {
+    marginTop: 7,
+    color: '#64748B',
+    fontSize: 13,
   },
 });

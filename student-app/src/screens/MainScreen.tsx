@@ -5,13 +5,14 @@ import { AppHeader } from '../components/AppHeader';
 import { BottomTabBar } from '../components/BottomTabBar';
 import {
   mockCohorts,
-  mockResults,
   mockStudent,
   mockWorkbooks,
 } from '../mock/studentMockData';
 import { useSolveProgress } from '../state/SolveProgressContext';
 import type { ScreenProps } from '../types/navigation';
 import type { MainTab } from '../types/student';
+import { calculateSolveProgressRate } from '../utils/solveProgress';
+import { resolveWorkbookStatus } from '../utils/workbookStatus';
 import { ProfileScreen } from './ProfileScreen';
 import { WorkbookListScreen } from './WorkbookListScreen';
 import { WrongAnswerScreen } from './WrongAnswerScreen';
@@ -30,7 +31,7 @@ export function MainScreen({ navigation, route }: ScreenProps<'Main'>) {
     if (route.params.initialTab) {
       setActiveTab(route.params.initialTab);
     }
-  }, [route.params.initialTab]);
+  }, [route.params.initialTab, route.params.tabRequestKey]);
 
   const cohort = useMemo(
     () => mockCohorts.find((item) => item.id === route.params.cohortId) ?? mockCohorts[0],
@@ -40,19 +41,16 @@ export function MainScreen({ navigation, route }: ScreenProps<'Main'>) {
   const cohortWorkbooks = useMemo(
     () => mockWorkbooks
       .filter((workbook) => workbook.cohortId === cohort.id)
-      .map((workbook) => ({
-        ...workbook,
-        status: getProgress(workbook.id)?.status ?? workbook.status,
-      })),
-    [cohort.id, getProgress, progressList],
-  );
+      .map((workbook) => {
+        const progress = getProgress(workbook.id);
 
-  const cohortResults = useMemo(
-    () =>
-      mockResults.filter((result) =>
-        cohortWorkbooks.some((workbook) => workbook.id === result.workbookId),
-      ),
-    [cohortWorkbooks],
+        return {
+          ...workbook,
+          status: resolveWorkbookStatus(workbook, progress),
+          progressRate: calculateSolveProgressRate(workbook, progress),
+        };
+      }),
+    [cohort.id, getProgress, progressList],
   );
 
   const renderContent = () => {
@@ -61,7 +59,7 @@ export function MainScreen({ navigation, route }: ScreenProps<'Main'>) {
     }
 
     if (activeTab === 'profile') {
-      return <ProfileScreen student={mockStudent} cohort={cohort} results={cohortResults} />;
+      return <ProfileScreen student={mockStudent} cohort={cohort} />;
     }
 
     return (

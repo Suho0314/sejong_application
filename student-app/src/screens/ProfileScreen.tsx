@@ -1,19 +1,18 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ScoreSummaryCard } from '../components/ScoreSummaryCard';
-import type { Cohort, Student, WorkbookResult } from '../types/student';
+import { useSubmissionHistory } from '../state/SubmissionHistoryContext';
+import type { Cohort, Student } from '../types/student';
+import { calculateStudentPerformance } from '../utils/studentPerformance';
 
 type ProfileScreenProps = {
   student: Student;
   cohort: Cohort;
-  results: WorkbookResult[];
 };
 
-export function ProfileScreen({ student, cohort, results }: ProfileScreenProps) {
-  const solvedWorkbookCount = results.length;
-  const totalCorrect = results.reduce((sum, result) => sum + result.correctCount, 0);
-  const totalSolved = results.reduce((sum, result) => sum + result.solvedQuestionCount, 0);
-  const correctRate = totalSolved === 0 ? 0 : Math.round((totalCorrect / totalSolved) * 100);
+export function ProfileScreen({ student, cohort }: ProfileScreenProps) {
+  const { submissions } = useSubmissionHistory();
+  const summary = calculateStudentPerformance(submissions, cohort.id);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -34,9 +33,9 @@ export function ProfileScreen({ student, cohort, results }: ProfileScreenProps) 
       </View>
 
       <ScoreSummaryCard
-        correctRate={correctRate}
-        solvedWorkbookCount={solvedWorkbookCount}
-        correctCount={totalCorrect}
+        correctRate={summary.correctRate}
+        solvedWorkbookCount={summary.solvedWorkbookCount}
+        correctCount={summary.correctCount}
       />
     </ScrollView>
   );

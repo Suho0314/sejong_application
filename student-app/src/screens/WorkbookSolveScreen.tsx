@@ -10,11 +10,12 @@ import type { ScreenProps } from '../types/navigation';
 import type { StudentAnswer } from '../types/student';
 import { gradeWorkbook } from '../utils/gradeWorkbook';
 import { createInitialSolveState, upsertStudentAnswer } from '../utils/solveProgress';
+import { getStartProgressStatus, resolveWorkbookStatus } from '../utils/workbookStatus';
 
 export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'WorkbookSolve'>) {
   const workbook = mockWorkbooks.find((item) => item.id === route.params.workbookId);
   const { addSubmission } = useSubmissionHistory();
-  const { completeProgress, getProgress, saveProgress, startProgress } = useSolveProgress();
+  const { getProgress, saveProgress, startProgress, submitProgress } = useSolveProgress();
   const savedProgress = getProgress(route.params.workbookId);
   const initialState = workbook
     ? createInitialSolveState(workbook, savedProgress)
@@ -24,10 +25,8 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
 
   useEffect(() => {
     if (workbook) {
-      const startStatus = savedProgress?.status === 'completed'
-        || (!savedProgress && workbook.status === 'completed')
-        ? 'retrying'
-        : 'inProgress';
+      const status = resolveWorkbookStatus(workbook, savedProgress);
+      const startStatus = getStartProgressStatus(status);
 
       startProgress(workbook.id, startStatus);
     }
@@ -63,7 +62,7 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
     const result = gradeWorkbook(workbook, answers);
 
     addSubmission(result);
-    completeProgress(workbook.id, answers);
+    submitProgress(workbook.id, answers);
     navigation.replace('Result', { result });
   };
 

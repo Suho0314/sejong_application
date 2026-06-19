@@ -1,22 +1,15 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Workbook } from '../types/student';
+import { workbookStatusLabel } from '../utils/workbookStatus';
 
 type WorkbookCardProps = {
   workbook: Workbook;
+  progressRate: number;
   onPress: () => void;
 };
 
-const statusText: Record<Workbook['status'], string> = {
-  notStarted: '미풀이',
-  inProgress: '풀이 중',
-  retrying: '다시 푸는 중',
-  completed: '완료',
-};
-
-export function WorkbookCard({ workbook, onPress }: WorkbookCardProps) {
-  const rate = workbook.correctRate ?? 0;
-
+export function WorkbookCard({ workbook, progressRate, onPress }: WorkbookCardProps) {
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.content}>
@@ -25,11 +18,11 @@ export function WorkbookCard({ workbook, onPress }: WorkbookCardProps) {
           <Text
             style={[
               styles.status,
-              workbook.status === 'completed' && styles.completedStatus,
+              workbook.status === 'submitted' && styles.submittedStatus,
               workbook.status === 'retrying' && styles.retryingStatus,
             ]}
           >
-            {statusText[workbook.status]}
+            {workbookStatusLabel[workbook.status]}
           </Text>
         </View>
 
@@ -40,9 +33,9 @@ export function WorkbookCard({ workbook, onPress }: WorkbookCardProps) {
 
         <View style={styles.rateRow}>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${rate}%` }]} />
+            <View style={[styles.progressFill, { width: `${progressRate}%` }]} />
           </View>
-          <Text style={styles.rateText}>{workbook.correctRate == null ? '-' : `${rate}%`}</Text>
+          <Text style={styles.rateText}>진행 {progressRate}%</Text>
         </View>
       </View>
     </Pressable>
@@ -84,7 +77,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-  completedStatus: {
+  submittedStatus: {
     color: '#1D4ED8',
     backgroundColor: '#DBEAFE',
   },
@@ -120,7 +113,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563EB',
   },
   rateText: {
-    width: 42,
+    width: 62,
     color: '#172554',
     fontSize: 13,
     fontWeight: '800',

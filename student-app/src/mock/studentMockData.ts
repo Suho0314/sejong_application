@@ -4,7 +4,6 @@ import type {
   Student,
   SubmissionRecord,
   Workbook,
-  WorkbookResult,
 } from '../types/student';
 import { gradeWorkbook } from '../utils/gradeWorkbook';
 
@@ -40,7 +39,7 @@ export const mockWorkbooks: Workbook[] = [
     chapterCount: 5,
     totalQuestions: 2,
     estimatedMinutes: 5,
-    status: 'completed',
+    status: 'submitted',
     correctRate: 100,
     questions: [
       {
@@ -147,7 +146,7 @@ export const mockWorkbooks: Workbook[] = [
     chapterCount: 3,
     totalQuestions: 2,
     estimatedMinutes: 5,
-    status: 'completed',
+    status: 'submitted',
     correctRate: 50,
     questions: [
       {
@@ -183,7 +182,7 @@ export const mockWorkbooks: Workbook[] = [
     chapterCount: 4,
     totalQuestions: 2,
     estimatedMinutes: 5,
-    status: 'completed',
+    status: 'submitted',
     correctRate: 100,
     questions: [
       {
@@ -214,6 +213,20 @@ export const mockWorkbooks: Workbook[] = [
 
 export const mockSubmissionHistory: SubmissionRecord[] = [
   {
+    id: 'submission-history-4',
+    submittedAt: '2026-06-18T08:40:00.000Z',
+    result: gradeWorkbook(mockWorkbooks[4], [
+      {
+        questionId: 'question-5-1',
+        selectedChoiceId: 'choice-5-1-1',
+      },
+      {
+        questionId: 'question-5-2',
+        selectedChoiceId: 'choice-5-2-2',
+      },
+    ]),
+  },
+  {
     id: 'submission-history-1',
     submittedAt: '2026-06-17T10:30:00.000Z',
     result: gradeWorkbook(mockWorkbooks[1], [
@@ -224,6 +237,34 @@ export const mockSubmissionHistory: SubmissionRecord[] = [
       {
         questionId: 'question-2-2',
         selectedChoiceId: 'choice-2-2-2',
+      },
+    ]),
+  },
+  {
+    id: 'submission-history-2',
+    submittedAt: '2026-06-15T09:20:00.000Z',
+    result: gradeWorkbook(mockWorkbooks[0], [
+      {
+        questionId: 'question-1-1',
+        selectedChoiceId: 'choice-1-1-3',
+      },
+      {
+        questionId: 'question-1-2',
+        selectedChoiceId: 'choice-1-2-2',
+      },
+    ]),
+  },
+  {
+    id: 'submission-history-3',
+    submittedAt: '2026-06-12T11:10:00.000Z',
+    result: gradeWorkbook(mockWorkbooks[3], [
+      {
+        questionId: 'question-4-1',
+        selectedChoiceId: 'choice-4-1-2',
+      },
+      {
+        questionId: 'question-4-2',
+        selectedChoiceId: 'choice-4-2-2',
       },
     ]),
   },
@@ -239,37 +280,7 @@ export const mockSolveProgress: SolveProgress[] = [
         selectedChoiceId: 'choice-2-1-2',
       },
     ],
-    status: 'inProgress',
+    status: 'retrying',
     updatedAt: '2026-06-18T14:10:00.000Z',
-  },
-];
-
-export const mockResults: WorkbookResult[] = [
-  {
-    id: 'result-1',
-    workbookId: 'workbook-1',
-    solvedQuestionCount: 2,
-    correctCount: 2,
-    wrongCount: 0,
-    correctRate: 100,
-    submittedAt: '2026-06-15',
-  },
-  {
-    id: 'result-2',
-    workbookId: 'workbook-2',
-    solvedQuestionCount: 2,
-    correctCount: 1,
-    wrongCount: 1,
-    correctRate: 50,
-    submittedAt: '2026-06-17',
-  },
-  {
-    id: 'result-3',
-    workbookId: 'workbook-4',
-    solvedQuestionCount: 2,
-    correctCount: 1,
-    wrongCount: 1,
-    correctRate: 50,
-    submittedAt: '2026-06-12',
   },
 ];

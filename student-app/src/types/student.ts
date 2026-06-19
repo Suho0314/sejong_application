@@ -12,7 +12,7 @@ export type Cohort = {
   period: string;
 };
 
-export type WorkbookStatus = 'notStarted' | 'inProgress' | 'retrying' | 'completed';
+export type WorkbookStatus = 'notStarted' | 'inProgress' | 'retrying' | 'submitted';
 
 export type Choice = {
   id: string;
@@ -45,7 +45,7 @@ export type StudentAnswer = {
   selectedChoiceId: string;
 };
 
-export type SolveProgressStatus = 'inProgress' | 'retrying' | 'completed';
+export type SolveProgressStatus = Exclude<WorkbookStatus, 'notStarted'>;
 
 export type SolveProgress = {
   workbookId: string;
@@ -58,6 +58,7 @@ export type SolveProgress = {
 export type GradedAnswer = {
   questionId: string;
   questionContent: string;
+  choices: Choice[];
   selectedChoiceId?: string;
   selectedChoiceText: string;
   correctChoiceId: string;
@@ -83,14 +84,20 @@ export type SubmissionRecord = {
   result: SubmissionResult;
 };
 
-export type WorkbookResult = {
-  id: string;
+export type WrongAnswerHistoryGroup = {
   workbookId: string;
-  solvedQuestionCount: number;
+  workbookTitle: string;
+  latestSubmittedAt: string;
+  latestScore: number;
+  latestCorrectRate: number;
+  wrongAnswers: GradedAnswer[];
+};
+
+export type StudentPerformanceSummary = {
+  solvedWorkbookCount: number;
+  totalQuestions: number;
   correctCount: number;
-  wrongCount: number;
   correctRate: number;
-  submittedAt: string;
 };
 
 export type MainTab = 'workbooks' | 'wrongAnswers' | 'profile';

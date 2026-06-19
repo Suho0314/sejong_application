@@ -3,7 +3,7 @@ import { createContext, type PropsWithChildren, useContext, useMemo, useState } 
 import { mockSolveProgress } from '../mock/studentMockData';
 import type { SolveProgress, SolveProgressStatus, StudentAnswer } from '../types/student';
 
-type ActiveSolveProgressStatus = Exclude<SolveProgressStatus, 'completed'>;
+type ActiveSolveProgressStatus = Exclude<SolveProgressStatus, 'submitted'>;
 
 type SolveProgressContextValue = {
   progressList: SolveProgress[];
@@ -14,7 +14,7 @@ type SolveProgressContextValue = {
     currentQuestionIndex: number,
     answers: StudentAnswer[],
   ) => void;
-  completeProgress: (workbookId: string, answers: StudentAnswer[]) => void;
+  submitProgress: (workbookId: string, answers: StudentAnswer[]) => void;
 };
 
 const SolveProgressContext = createContext<SolveProgressContextValue | null>(null);
@@ -58,12 +58,12 @@ export function SolveProgressProvider({ children }: PropsWithChildren) {
         return [progress, ...previous.filter((item) => item.workbookId !== workbookId)];
       });
     },
-    completeProgress: (workbookId, answers) => {
+    submitProgress: (workbookId, answers) => {
       const progress: SolveProgress = {
         workbookId,
         currentQuestionIndex: 0,
         answers,
-        status: 'completed',
+        status: 'submitted',
         updatedAt: new Date().toISOString(),
       };
 

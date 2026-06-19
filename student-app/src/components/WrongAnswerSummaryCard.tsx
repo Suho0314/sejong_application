@@ -1,9 +1,9 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { SubmissionRecord } from '../types/student';
+import type { WrongAnswerHistoryGroup } from '../types/student';
 
 type WrongAnswerSummaryCardProps = {
-  submission: SubmissionRecord;
+  history: WrongAnswerHistoryGroup;
 };
 
 function formatSubmittedAt(value: string) {
@@ -22,32 +22,32 @@ function formatSubmittedAt(value: string) {
   });
 }
 
-export function WrongAnswerSummaryCard({ submission }: WrongAnswerSummaryCardProps) {
-  const { result } = submission;
-
+export function WrongAnswerSummaryCard({ history }: WrongAnswerSummaryCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.title}>{result.workbookTitle}</Text>
-        <Text style={styles.wrongBadge}>오답 {result.wrongCount}개</Text>
+        <Text style={styles.title}>{history.workbookTitle}</Text>
+        <Text style={styles.wrongBadge}>오답 {history.wrongAnswers.length}개</Text>
       </View>
 
-      <Text style={styles.submittedAt}>{formatSubmittedAt(submission.submittedAt)} 제출</Text>
+      <Text style={styles.submittedAt}>
+        최근 제출 {formatSubmittedAt(history.latestSubmittedAt)}
+      </Text>
 
       <View style={styles.stats}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{result.score}점</Text>
-          <Text style={styles.statLabel}>점수</Text>
+          <Text style={styles.statValue}>{history.latestScore}점</Text>
+          <Text style={styles.statLabel}>최근 점수</Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{result.correctRate}%</Text>
-          <Text style={styles.statLabel}>정답률</Text>
+          <Text style={styles.statValue}>{history.latestCorrectRate}%</Text>
+          <Text style={styles.statLabel}>최근 정답률</Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, styles.wrongValue]}>{result.wrongCount}</Text>
-          <Text style={styles.statLabel}>오답</Text>
+          <Text style={[styles.statValue, styles.wrongValue]}>{history.wrongAnswers.length}</Text>
+          <Text style={styles.statLabel}>누적 오답</Text>
         </View>
       </View>
     </View>

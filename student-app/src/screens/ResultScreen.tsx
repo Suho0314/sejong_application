@@ -3,11 +3,37 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ResultSummaryCard } from '../components/ResultSummaryCard';
 import { WrongAnswerCard } from '../components/WrongAnswerCard';
+import { mockStudent } from '../mock/studentMockData';
 import type { ScreenProps } from '../types/navigation';
 
 export function ResultScreen({ navigation, route }: ScreenProps<'Result'>) {
-  const { result } = route.params;
-  const wrongAnswers = result.gradedAnswers.filter((answer) => !answer.isCorrect);
+  const result = route.params?.result;
+
+  if (!result) {
+    return (
+      <View style={styles.emptyContainer}>
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>표시할 결과가 없습니다</Text>
+          <Text style={styles.emptyDescription}>
+            문제집을 제출한 뒤 결과 화면에서 점수와 오답을 확인할 수 있습니다.
+          </Text>
+          <PrimaryButton
+            onPress={() =>
+              navigation.navigate('Main', {
+                cohortId: mockStudent.cohortId,
+                initialTab: 'workbooks',
+                tabRequestKey: Date.now(),
+              })
+            }
+          >
+            문제집 목록으로
+          </PrimaryButton>
+        </View>
+      </View>
+    );
+  }
+
+  const wrongAnswers = (result.gradedAnswers ?? []).filter((answer) => !answer.isCorrect);
 
   return (
     <View style={styles.container}>
@@ -55,6 +81,7 @@ export function ResultScreen({ navigation, route }: ScreenProps<'Result'>) {
               navigation.navigate('Main', {
                 cohortId: result.cohortId,
                 initialTab: 'wrongAnswers',
+                tabRequestKey: Date.now(),
               })
             }
           >
@@ -67,6 +94,7 @@ export function ResultScreen({ navigation, route }: ScreenProps<'Result'>) {
               navigation.navigate('Main', {
                 cohortId: result.cohortId,
                 initialTab: 'workbooks',
+                tabRequestKey: Date.now(),
               })
             }
           >
@@ -172,5 +200,30 @@ const styles = StyleSheet.create({
   },
   buttonItem: {
     flex: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: '#F3F4F6',
+  },
+  emptyCard: {
+    padding: 24,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+  },
+  emptyTitle: {
+    color: '#172554',
+    fontSize: 21,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  emptyDescription: {
+    marginTop: 9,
+    marginBottom: 22,
+    color: '#64748B',
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
   },
 });

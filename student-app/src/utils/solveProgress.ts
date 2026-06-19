@@ -37,3 +37,32 @@ export function upsertStudentAnswer(
     { questionId, selectedChoiceId },
   ];
 }
+
+export function calculateSolveProgressRate(
+  workbook: Workbook,
+  progress?: SolveProgress,
+): number {
+  const status = progress?.status ?? workbook.status;
+
+  if (status === 'submitted') {
+    return 100;
+  }
+
+  if (!progress || workbook.questions.length === 0) {
+    return 0;
+  }
+
+  const answeredQuestionIds = new Set(
+    progress.answers
+      .filter((answer) =>
+        workbook.questions.some(
+          (question) =>
+            question.id === answer.questionId
+            && question.choices.some((choice) => choice.id === answer.selectedChoiceId),
+        ),
+      )
+      .map((answer) => answer.questionId),
+  );
+
+  return Math.round((answeredQuestionIds.size / workbook.questions.length) * 100);
+}

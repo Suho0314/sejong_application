@@ -4,14 +4,12 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { mockWorkbooks } from '../mock/studentMockData';
 import { useSolveProgress } from '../state/SolveProgressContext';
 import type { ScreenProps } from '../types/navigation';
-import type { WorkbookStatus } from '../types/student';
-
-const statusText: Record<WorkbookStatus, string> = {
-  notStarted: '미풀이',
-  inProgress: '풀이 중',
-  retrying: '다시 푸는 중',
-  completed: '완료',
-};
+import {
+  getWorkbookActionLabel,
+  isActiveWorkbookStatus,
+  resolveWorkbookStatus,
+  workbookStatusLabel,
+} from '../utils/workbookStatus';
 
 export function WorkbookDetailScreen({ navigation, route }: ScreenProps<'WorkbookDetail'>) {
   const workbook = mockWorkbooks.find((item) => item.id === route.params.workbookId);
@@ -27,14 +25,8 @@ export function WorkbookDetailScreen({ navigation, route }: ScreenProps<'Workboo
     );
   }
 
-  const effectiveStatus: WorkbookStatus = solveProgress?.status ?? workbook.status;
-  const buttonLabel = solveProgress?.status === 'retrying'
-    ? '다시 풀기 이어하기'
-    : solveProgress?.status === 'inProgress'
-      ? '풀이 이어하기'
-    : effectiveStatus === 'completed'
-      ? '다시 풀기'
-      : '풀이 시작';
+  const effectiveStatus = resolveWorkbookStatus(workbook, solveProgress);
+  const buttonLabel = getWorkbookActionLabel(effectiveStatus);
 
   return (
     <View style={styles.container}>
@@ -42,13 +34,13 @@ export function WorkbookDetailScreen({ navigation, route }: ScreenProps<'Workboo
         <View style={styles.heroCard}>
           <View style={styles.badgeRow}>
             <Text style={styles.subject}>{workbook.subject}</Text>
-            <Text style={styles.status}>{statusText[effectiveStatus]}</Text>
+            <Text style={styles.status}>{workbookStatusLabel[effectiveStatus]}</Text>
           </View>
           <Text style={styles.title}>{workbook.title}</Text>
           <Text style={styles.description}>{workbook.description}</Text>
         </View>
 
-        {solveProgress?.status === 'inProgress' || solveProgress?.status === 'retrying' ? (
+        {isActiveWorkbookStatus(effectiveStatus) && solveProgress ? (
           <View style={styles.progressCard}>
             <Text style={styles.progressTitle}>
               {solveProgress.status === 'retrying' ? '다시 푸는 중' : '풀이 진행 중'}
