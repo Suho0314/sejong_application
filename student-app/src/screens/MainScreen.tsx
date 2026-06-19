@@ -50,7 +50,7 @@ export function MainScreen({ navigation, route }: ScreenProps<'Main'>) {
 
   const renderContent = () => {
     if (activeTab === 'wrongAnswers') {
-      return <WrongAnswerScreen results={cohortResults} workbooks={cohortWorkbooks} />;
+      return <WrongAnswerScreen cohortId={cohort.id} />;
     }
 
     if (activeTab === 'profile') {

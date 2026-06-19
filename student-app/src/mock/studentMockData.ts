@@ -1,4 +1,11 @@
-import type { Cohort, Student, Workbook, WorkbookResult } from '../types/student';
+import type {
+  Cohort,
+  Student,
+  SubmissionRecord,
+  Workbook,
+  WorkbookResult,
+} from '../types/student';
+import { gradeWorkbook } from '../utils/gradeWorkbook';
 
 export const mockStudent: Student = {
   id: 'student-1',
@@ -201,6 +208,23 @@ export const mockWorkbooks: Workbook[] = [
         answerIndex: 1,
       },
     ],
+  },
+];
+
+export const mockSubmissionHistory: SubmissionRecord[] = [
+  {
+    id: 'submission-history-1',
+    submittedAt: '2026-06-17T10:30:00.000Z',
+    result: gradeWorkbook(mockWorkbooks[1], [
+      {
+        questionId: 'question-2-1',
+        selectedChoiceId: 'choice-2-1-2',
+      },
+      {
+        questionId: 'question-2-2',
+        selectedChoiceId: 'choice-2-2-2',
+      },
+    ]),
   },
 ];
 
