@@ -6,6 +6,16 @@ export type RootStackParamList = {
   Main: {
     cohortId: string;
   };
+  WorkbookDetail: {
+    workbookId: string;
+  };
+  WorkbookSolve: {
+    workbookId: string;
+  };
+  SubmissionResult: {
+    workbookId: string;
+    answeredCount: number;
+  };
 };
 
 export type ScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<

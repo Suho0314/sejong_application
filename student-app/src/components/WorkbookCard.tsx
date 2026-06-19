@@ -4,6 +4,7 @@ import type { Workbook } from '../types/student';
 
 type WorkbookCardProps = {
   workbook: Workbook;
+  onPress: () => void;
 };
 
 const statusText: Record<Workbook['status'], string> = {
@@ -12,11 +13,11 @@ const statusText: Record<Workbook['status'], string> = {
   completed: '완료',
 };
 
-export function WorkbookCard({ workbook }: WorkbookCardProps) {
+export function WorkbookCard({ workbook, onPress }: WorkbookCardProps) {
   const rate = workbook.correctRate ?? 0;
 
   return (
-    <Pressable style={styles.card}>
+    <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.content}>
         <View style={styles.topRow}>
           <Text style={styles.subject}>{workbook.subject}</Text>
@@ -27,7 +28,7 @@ export function WorkbookCard({ workbook }: WorkbookCardProps) {
 
         <Text style={styles.title}>{workbook.title}</Text>
         <Text style={styles.meta}>
-          챕터 {workbook.chapterCount} · 문제 {workbook.questionCount}
+          챕터 {workbook.chapterCount} · 문제 {workbook.totalQuestions}
         </Text>
 
         <View style={styles.rateRow}>

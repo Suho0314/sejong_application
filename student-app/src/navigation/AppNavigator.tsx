@@ -4,6 +4,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { CohortSelectScreen } from '../screens/CohortSelectScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { MainScreen } from '../screens/MainScreen';
+import { SubmissionResultScreen } from '../screens/SubmissionResultScreen';
+import { WorkbookDetailScreen } from '../screens/WorkbookDetailScreen';
+import { WorkbookSolveScreen } from '../screens/WorkbookSolveScreen';
 import type { RootStackParamList } from '../types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -28,6 +31,21 @@ export function AppNavigator() {
           options={{ title: '기수 선택' }}
         />
         <Stack.Screen name="Main" component={MainScreen} options={{ headerShown: false }} />
+        <Stack.Screen
+          name="WorkbookDetail"
+          component={WorkbookDetailScreen}
+          options={{ title: '문제집 상세' }}
+        />
+        <Stack.Screen
+          name="WorkbookSolve"
+          component={WorkbookSolveScreen}
+          options={{ title: '문제 풀이' }}
+        />
+        <Stack.Screen
+          name="SubmissionResult"
+          component={SubmissionResultScreen}
+          options={{ title: '제출 완료', headerBackVisible: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

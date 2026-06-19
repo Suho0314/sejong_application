@@ -4,11 +4,25 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 type PrimaryButtonProps = PropsWithChildren<{
   onPress: () => void;
   variant?: 'primary' | 'light';
+  disabled?: boolean;
 }>;
 
-export function PrimaryButton({ children, onPress, variant = 'primary' }: PrimaryButtonProps) {
+export function PrimaryButton({
+  children,
+  onPress,
+  variant = 'primary',
+  disabled = false,
+}: PrimaryButtonProps) {
   return (
-    <Pressable style={[styles.button, variant === 'light' && styles.lightButton]} onPress={onPress}>
+    <Pressable
+      style={[
+        styles.button,
+        variant === 'light' && styles.lightButton,
+        disabled && styles.disabledButton,
+      ]}
+      onPress={onPress}
+      disabled={disabled}
+    >
       <Text style={[styles.label, variant === 'light' && styles.lightLabel]}>{children}</Text>
     </Pressable>
   );
@@ -25,6 +39,9 @@ const styles = StyleSheet.create({
   },
   lightButton: {
     backgroundColor: '#EFF6FF',
+  },
+  disabledButton: {
+    opacity: 0.45,
   },
   label: {
     color: '#FFFFFF',

@@ -14,15 +14,35 @@ export type Cohort = {
 
 export type WorkbookStatus = 'notStarted' | 'inProgress' | 'completed';
 
+export type Choice = {
+  id: string;
+  text: string;
+};
+
+export type Question = {
+  id: string;
+  content: string;
+  choices: Choice[];
+  answerIndex: number;
+};
+
 export type Workbook = {
   id: string;
   cohortId: string;
   title: string;
+  description: string;
   subject: string;
   chapterCount: number;
-  questionCount: number;
+  totalQuestions: number;
+  estimatedMinutes: number;
   status: WorkbookStatus;
   correctRate?: number;
+  questions: Question[];
+};
+
+export type StudentAnswer = {
+  questionId: string;
+  selectedChoiceId: string;
 };
 
 export type WorkbookResult = {

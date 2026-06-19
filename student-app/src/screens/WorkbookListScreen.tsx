@@ -6,9 +6,14 @@ import type { Cohort, Workbook } from '../types/student';
 type WorkbookListScreenProps = {
   cohort: Cohort;
   workbooks: Workbook[];
+  onWorkbookPress: (workbookId: string) => void;
 };
 
-export function WorkbookListScreen({ cohort, workbooks }: WorkbookListScreenProps) {
+export function WorkbookListScreen({
+  cohort,
+  workbooks,
+  onWorkbookPress,
+}: WorkbookListScreenProps) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.noticeCard}>
@@ -23,7 +28,11 @@ export function WorkbookListScreen({ cohort, workbooks }: WorkbookListScreenProp
       </View>
 
       {workbooks.map((workbook) => (
-        <WorkbookCard key={workbook.id} workbook={workbook} />
+        <WorkbookCard
+          key={workbook.id}
+          workbook={workbook}
+          onPress={() => onWorkbookPress(workbook.id)}
+        />
       ))}
     </ScrollView>
   );

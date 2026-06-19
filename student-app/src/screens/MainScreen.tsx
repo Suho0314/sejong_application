@@ -21,7 +21,7 @@ const tabTitle: Record<MainTab, string> = {
   profile: '내 정보',
 };
 
-export function MainScreen({ route }: ScreenProps<'Main'>) {
+export function MainScreen({ navigation, route }: ScreenProps<'Main'>) {
   const [activeTab, setActiveTab] = useState<MainTab>('workbooks');
 
   const cohort = useMemo(
@@ -51,7 +51,13 @@ export function MainScreen({ route }: ScreenProps<'Main'>) {
       return <ProfileScreen student={mockStudent} cohort={cohort} results={cohortResults} />;
     }
 
-    return <WorkbookListScreen cohort={cohort} workbooks={cohortWorkbooks} />;
+    return (
+      <WorkbookListScreen
+        cohort={cohort}
+        workbooks={cohortWorkbooks}
+        onWorkbookPress={(workbookId) => navigation.navigate('WorkbookDetail', { workbookId })}
+      />
+    );
   };
 
   return (
