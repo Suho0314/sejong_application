@@ -1,5 +1,16 @@
-import { PageTitle } from '../../../components/common/PageTitle';
+import { AdminAccountSettings } from '../../../components/admin/AdminAccountSettings';
 
 export function SettingsPage() {
-  return <PageTitle title="설정" description="강사용 웹 설정을 관리합니다." />;
+  return (
+    <div className="dashboard-page">
+      <section className="page-heading">
+        <div>
+          <p className="eyebrow">Settings</p>
+          <h1>설정</h1>
+        </div>
+      </section>
+
+      <AdminAccountSettings />
+    </div>
+  );
 }
