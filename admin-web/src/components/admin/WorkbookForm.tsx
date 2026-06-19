@@ -5,7 +5,6 @@ export type WorkbookFormValues = {
   title: string;
   description: string;
   status: ContentStatus;
-  timeLimitMinutes: number | null;
 };
 
 type WorkbookFormProps = {
@@ -19,7 +18,6 @@ const defaultValues: WorkbookFormValues = {
   title: '',
   description: '',
   status: 'draft',
-  timeLimitMinutes: 60,
 };
 
 export function WorkbookForm({ initialValues, mode, onCancel, onSubmit }: WorkbookFormProps) {
@@ -35,7 +33,6 @@ export function WorkbookForm({ initialValues, mode, onCancel, onSubmit }: Workbo
       ...values,
       title,
       description: values.description.trim(),
-      timeLimitMinutes: values.timeLimitMinutes && values.timeLimitMinutes > 0 ? values.timeLimitMinutes : null,
     });
   };
 
@@ -64,22 +61,6 @@ export function WorkbookForm({ initialValues, mode, onCancel, onSubmit }: Workbo
             <option value="published">게시</option>
             <option value="archived">보관</option>
           </select>
-        </label>
-
-        <label>
-          <span>제한 시간</span>
-          <input
-            min={1}
-            type="number"
-            value={values.timeLimitMinutes ?? ''}
-            onChange={(event) =>
-              setValues((current) => ({
-                ...current,
-                timeLimitMinutes: event.target.value ? Number(event.target.value) : null,
-              }))
-            }
-            placeholder="분 단위"
-          />
         </label>
 
         <label>

@@ -31,7 +31,6 @@ type WorkbookRow = {
   title: string;
   description?: string;
   status: ContentStatus;
-  timeLimitMinutes?: number | null;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
@@ -54,7 +53,6 @@ const initialWorkbooks = workbooksData.map((workbook) => ({
   title: workbook.title,
   description: workbook.description,
   status: workbook.status as ContentStatus,
-  timeLimitMinutes: workbook.timeLimitMinutes,
   createdAt: workbook.createdAt,
   updatedAt: workbook.updatedAt,
   deletedAt: workbook.deletedAt,
@@ -201,7 +199,6 @@ export function WorkbookPage() {
         title: editingWorkbook.title,
         description: editingWorkbook.description ?? '',
         status: editingWorkbook.status,
-        timeLimitMinutes: editingWorkbook.timeLimitMinutes ?? null,
       }
     : undefined;
 
@@ -231,7 +228,6 @@ export function WorkbookPage() {
         title: values.title,
         description: values.description,
         status: values.status,
-        timeLimitMinutes: values.timeLimitMinutes,
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
@@ -253,7 +249,6 @@ export function WorkbookPage() {
               title: values.title,
               description: values.description,
               status: values.status,
-              timeLimitMinutes: values.timeLimitMinutes,
               updatedAt: now,
             }
           : workbook,

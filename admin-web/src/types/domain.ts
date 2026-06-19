@@ -82,7 +82,6 @@ export type Workbook = {
   title: string;
   description?: string;
   status: ContentStatus;
-  timeLimitMinutes?: number | null;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;

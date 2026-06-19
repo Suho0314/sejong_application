@@ -5,7 +5,6 @@ export type WorkbookTableRow = {
   title: string;
   description?: string;
   status: ContentStatus;
-  timeLimitMinutes?: number | null;
   questionCount: number;
   totalScore: number;
   updatedAt: string;
@@ -42,7 +41,6 @@ export function WorkbookTable({ selectedWorkbookId, workbooks, onDelete, onEdit,
             <th>상태</th>
             <th>문항수</th>
             <th>총점</th>
-            <th>제한시간</th>
             <th>수정일</th>
             <th>편집</th>
             <th>삭제</th>
@@ -65,7 +63,6 @@ export function WorkbookTable({ selectedWorkbookId, workbooks, onDelete, onEdit,
               </td>
               <td>{workbook.questionCount.toLocaleString('ko-KR')}문항</td>
               <td>{workbook.totalScore.toLocaleString('ko-KR')}점</td>
-              <td>{workbook.timeLimitMinutes ? `${workbook.timeLimitMinutes}분` : '-'}</td>
               <td>{formatDate(workbook.updatedAt)}</td>
               <td>
                 <button className="text-button" type="button" onClick={() => onEdit(workbook)}>
@@ -81,7 +78,7 @@ export function WorkbookTable({ selectedWorkbookId, workbooks, onDelete, onEdit,
           ))}
           {workbooks.length === 0 ? (
             <tr>
-              <td className="empty-cell" colSpan={8}>
+              <td className="empty-cell" colSpan={7}>
                 검색 결과가 없습니다.
               </td>
             </tr>
