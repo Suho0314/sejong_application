@@ -4,12 +4,14 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { QuestionCard } from '../components/QuestionCard';
 import { mockWorkbooks } from '../mock/studentMockData';
+import { useSubmissionHistory } from '../state/SubmissionHistoryContext';
 import type { ScreenProps } from '../types/navigation';
 import type { StudentAnswer } from '../types/student';
 import { gradeWorkbook } from '../utils/gradeWorkbook';
 
 export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'WorkbookSolve'>) {
   const workbook = mockWorkbooks.find((item) => item.id === route.params.workbookId);
+  const { addSubmission } = useSubmissionHistory();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<StudentAnswer[]>([]);
 
@@ -37,6 +39,7 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
   const submit = () => {
     const result = gradeWorkbook(workbook, answers);
 
+    addSubmission(result);
     navigation.replace('Result', { result });
   };
 

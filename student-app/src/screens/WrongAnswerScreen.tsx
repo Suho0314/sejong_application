@@ -1,45 +1,56 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import type { Workbook, WorkbookResult } from '../types/student';
+import { WrongAnswerCard } from '../components/WrongAnswerCard';
+import { WrongAnswerSummaryCard } from '../components/WrongAnswerSummaryCard';
+import { useSubmissionHistory } from '../state/SubmissionHistoryContext';
 
 type WrongAnswerScreenProps = {
-  results: WorkbookResult[];
-  workbooks: Workbook[];
+  cohortId: string;
 };
 
-export function WrongAnswerScreen({ results, workbooks }: WrongAnswerScreenProps) {
+export function WrongAnswerScreen({ cohortId }: WrongAnswerScreenProps) {
+  const { submissions } = useSubmissionHistory();
+  const wrongSubmissions = submissions.filter(
+    (submission) => submission.result.cohortId === cohortId && submission.result.wrongCount > 0,
+  );
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.heroCard}>
         <Text style={styles.heroTitle}>틀린 문제를 다시 확인해요</Text>
-        <Text style={styles.heroDescription}>문제집별 정답률과 오답 개수를 한눈에 볼 수 있습니다.</Text>
+        <Text style={styles.heroDescription}>
+          제출한 문제집별 점수와 오답을 앱을 종료하기 전까지 확인할 수 있습니다.
+        </Text>
       </View>
 
-      {results.map((result) => {
-        const workbook = workbooks.find((item) => item.id === result.workbookId);
+      {wrongSubmissions.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyIcon}>✓</Text>
+          <Text style={styles.emptyTitle}>정리할 오답이 없습니다</Text>
+          <Text style={styles.emptyDescription}>
+            문제집을 제출하고 틀린 문제가 생기면 이곳에 표시됩니다.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.historyList}>
+          {wrongSubmissions.map((submission) => {
+            const wrongAnswers = submission.result.gradedAnswers.filter(
+              (answer) => !answer.isCorrect,
+            );
 
-        if (!workbook) {
-          return null;
-        }
-
-        return (
-          <View key={result.id} style={styles.card}>
-            <View style={styles.cardTop}>
-              <Text style={styles.subject}>{workbook.subject}</Text>
-              <Text style={styles.wrongCount}>오답 {result.wrongCount}개</Text>
-            </View>
-            <Text style={styles.title}>{workbook.title}</Text>
-            <Text style={styles.meta}>{result.submittedAt} 제출</Text>
-
-            <View style={styles.rateRow}>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${result.correctRate}%` }]} />
+            return (
+              <View key={submission.id} style={styles.historyGroup}>
+                <WrongAnswerSummaryCard submission={submission} />
+                <View style={styles.answerList}>
+                  {wrongAnswers.map((answer, index) => (
+                    <WrongAnswerCard key={answer.questionId} answer={answer} index={index} />
+                  ))}
+                </View>
               </View>
-              <Text style={styles.rate}>{result.correctRate}%</Text>
-            </View>
-          </View>
-        );
-      })}
+            );
+          })}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -70,66 +81,48 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  card: {
-    marginBottom: 14,
-    padding: 18,
-    borderRadius: 18,
+  historyList: {
+    gap: 20,
+  },
+  historyGroup: {
+    gap: 10,
+  },
+  answerList: {
+    gap: 10,
+    paddingLeft: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#BFDBFE',
+  },
+  emptyCard: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 42,
+    borderRadius: 22,
     backgroundColor: '#FFFFFF',
   },
-  cardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  subject: {
-    color: '#2563EB',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  wrongCount: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  emptyIcon: {
+    width: 54,
+    height: 54,
+    paddingTop: 9,
     overflow: 'hidden',
-    borderRadius: 999,
-    color: '#DC2626',
-    backgroundColor: '#FEF2F2',
-    fontSize: 12,
+    borderRadius: 27,
+    color: '#1D4ED8',
+    backgroundColor: '#DBEAFE',
+    fontSize: 25,
     fontWeight: '900',
+    textAlign: 'center',
   },
-  title: {
-    marginTop: 10,
+  emptyTitle: {
+    marginTop: 18,
     color: '#172554',
     fontSize: 18,
     fontWeight: '900',
   },
-  meta: {
-    marginTop: 6,
+  emptyDescription: {
+    marginTop: 8,
     color: '#64748B',
     fontSize: 13,
-  },
-  rateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 14,
-  },
-  track: {
-    flex: 1,
-    height: 8,
-    overflow: 'hidden',
-    borderRadius: 999,
-    backgroundColor: '#E5E7EB',
-  },
-  fill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#2563EB',
-  },
-  rate: {
-    width: 42,
-    color: '#172554',
-    fontSize: 13,
-    fontWeight: '900',
-    textAlign: 'right',
+    lineHeight: 19,
+    textAlign: 'center',
   },
 });

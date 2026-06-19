@@ -67,6 +67,12 @@ export type SubmissionResult = {
   gradedAnswers: GradedAnswer[];
 };
 
+export type SubmissionRecord = {
+  id: string;
+  submittedAt: string;
+  result: SubmissionResult;
+};
+
 export type WorkbookResult = {
   id: string;
   workbookId: string;
