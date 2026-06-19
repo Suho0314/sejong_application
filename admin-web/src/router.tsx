@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminLayout } from './components/layout/AdminLayout';
 import { LoginPage } from './pages/auth/LoginPage';
 import { CohortPage } from './pages/admin/cohort';
@@ -21,17 +22,22 @@ export const router = createBrowserRouter([
   },
   {
     path: '/admin',
-    element: <AdminLayout />,
+    element: <ProtectedRoute />,
     children: [
-      { index: true, element: <Navigate to="/admin/dashboard" replace /> },
-      { path: 'dashboard', element: <DashboardPage /> },
-      { path: 'cohorts', element: <CohortPage /> },
-      { path: 'students', element: <StudentPage /> },
-      { path: 'questions', element: <QuestionPage /> },
-      { path: 'workbooks', element: <WorkbookPage /> },
-      { path: 'workbook-assignments', element: <WorkbookAssignmentPage /> },
-      { path: 'scores', element: <ScorePage /> },
-      { path: 'settings', element: <SettingsPage /> },
+      {
+        element: <AdminLayout />,
+        children: [
+          { index: true, element: <Navigate to="/admin/dashboard" replace /> },
+          { path: 'dashboard', element: <DashboardPage /> },
+          { path: 'cohorts', element: <CohortPage /> },
+          { path: 'students', element: <StudentPage /> },
+          { path: 'questions', element: <QuestionPage /> },
+          { path: 'workbooks', element: <WorkbookPage /> },
+          { path: 'workbook-assignments', element: <WorkbookAssignmentPage /> },
+          { path: 'scores', element: <ScorePage /> },
+          { path: 'settings', element: <SettingsPage /> },
+        ],
+      },
     ],
   },
 ]);
