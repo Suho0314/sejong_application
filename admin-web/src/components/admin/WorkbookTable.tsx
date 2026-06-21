@@ -1,3 +1,4 @@
+import { WorkbookStatusLabel } from '../../constants/statusLabels';
 import { ContentStatus } from '../../types/domain';
 
 export type WorkbookTableRow = {
@@ -5,8 +6,9 @@ export type WorkbookTableRow = {
   title: string;
   description?: string;
   status: ContentStatus;
+  passScore: number;
   questionCount: number;
-  totalScore: number;
+  totalScore?: number;
   updatedAt: string;
 };
 
@@ -16,12 +18,6 @@ type WorkbookTableProps = {
   onDelete: (workbookId: string) => void;
   onEdit: (workbook: WorkbookTableRow) => void;
   onSelect: (workbookId: string) => void;
-};
-
-const statusLabels: Record<ContentStatus, string> = {
-  draft: '초안',
-  published: '게시',
-  archived: '보관',
 };
 
 const formatDate = (value: string) =>
@@ -39,6 +35,7 @@ export function WorkbookTable({ selectedWorkbookId, workbooks, onDelete, onEdit,
           <tr>
             <th>문제집</th>
             <th>상태</th>
+            <th>합격점수</th>
             <th>문항수</th>
             <th>총점</th>
             <th>수정일</th>
@@ -59,10 +56,13 @@ export function WorkbookTable({ selectedWorkbookId, workbooks, onDelete, onEdit,
                 </span>
               </td>
               <td>
-                <span className={`status-pill status-${workbook.status}`}>{statusLabels[workbook.status]}</span>
+                <span className={`status-pill status-${workbook.status}`}>
+                  {WorkbookStatusLabel[workbook.status]}
+                </span>
               </td>
+              <td>{workbook.passScore.toLocaleString('ko-KR')}점</td>
               <td>{workbook.questionCount.toLocaleString('ko-KR')}문항</td>
-              <td>{workbook.totalScore.toLocaleString('ko-KR')}점</td>
+              <td>{typeof workbook.totalScore === 'number' ? `${workbook.totalScore.toLocaleString('ko-KR')}점` : '-'}</td>
               <td>{formatDate(workbook.updatedAt)}</td>
               <td>
                 <button className="text-button" type="button" onClick={() => onEdit(workbook)}>
@@ -78,7 +78,7 @@ export function WorkbookTable({ selectedWorkbookId, workbooks, onDelete, onEdit,
           ))}
           {workbooks.length === 0 ? (
             <tr>
-              <td className="empty-cell" colSpan={7}>
+              <td className="empty-cell" colSpan={8}>
                 검색 결과가 없습니다.
               </td>
             </tr>

@@ -27,3 +27,9 @@ export const WorkbookStatusLabel: Record<ContentStatus, string> = {
   published: '사용중',
   archived: '보관',
 };
+
+export const WorkbookStatusOptions = [
+  { value: 'draft', label: WorkbookStatusLabel.draft },
+  { value: 'published', label: WorkbookStatusLabel.published },
+  { value: 'archived', label: WorkbookStatusLabel.archived },
+] satisfies Array<{ value: ContentStatus; label: string }>;

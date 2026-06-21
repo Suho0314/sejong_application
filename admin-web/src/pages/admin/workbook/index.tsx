@@ -1,10 +1,14 @@
-import { CSSProperties, DragEvent, useMemo, useState } from 'react';
+import { CSSProperties, DragEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { questionApi, QuestionApiItem } from '../../../api/questions';
+import { workbookApi, WorkbookApiItem, WorkbookPayload, WorkbookQuestionApiItem } from '../../../api/workbooks';
+import { Pagination } from '../../../components/admin/Pagination';
 import { WorkbookForm, WorkbookFormValues } from '../../../components/admin/WorkbookForm';
 import { WorkbookTable, WorkbookTableRow } from '../../../components/admin/WorkbookTable';
-import questionsData from '../../../mock/questions.json';
-import workbookQuestionsData from '../../../mock/workbookQuestions.json';
-import workbooksData from '../../../mock/workbooks.json';
+import { QuestionStatusLabel, WorkbookStatusLabel, WorkbookStatusOptions } from '../../../constants/statusLabels';
 import { ContentStatus, Difficulty } from '../../../types/domain';
+
+const WORKBOOK_PAGE_SIZE = 5;
+const QUESTION_LIMIT = 100;
 
 type QuestionRow = {
   id: string;
@@ -12,75 +16,29 @@ type QuestionRow = {
   category?: string;
   difficulty: Difficulty;
   type: 'multiple_choice';
-  questionType?: 'multiple_choice';
   content: string;
-  stem?: string;
   choices: string[];
   correctAnswerIndex: number;
   explanation?: string;
   status: ContentStatus;
-  source?: string;
   createdAt: string;
   updatedAt: string;
-  deletedAt?: string | null;
-};
-
-type WorkbookRow = {
-  id: string;
-  createdBy: string;
-  title: string;
-  description?: string;
-  status: ContentStatus;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string | null;
 };
 
 type WorkbookQuestionRow = {
   id: string;
-  workbookId: string;
   questionId: string;
-  orderIndex: number;
-  score: number;
-  createdAt: string;
-  updatedAt: string;
+  sequence: number;
+  points: number;
+  isRequired: boolean;
+  questionContent?: string;
 };
-
-const questions = questionsData as QuestionRow[];
-const initialWorkbooks = workbooksData.map((workbook) => ({
-  id: workbook.id,
-  createdBy: workbook.createdBy,
-  title: workbook.title,
-  description: workbook.description,
-  status: workbook.status as ContentStatus,
-  createdAt: workbook.createdAt,
-  updatedAt: workbook.updatedAt,
-  deletedAt: workbook.deletedAt,
-})) satisfies WorkbookRow[];
-
-const initialWorkbookQuestions = workbookQuestionsData as WorkbookQuestionRow[];
 
 const difficultyLabels: Record<Difficulty, string> = {
   easy: '쉬움',
   medium: '보통',
   hard: '어려움',
 };
-
-const statusLabels: Record<ContentStatus, string> = {
-  draft: '초안',
-  published: '게시',
-  archived: '보관',
-};
-
-const getQuestionText = (question: QuestionRow) => question.content || question.stem || '문제 내용 없음';
-
-const createTimestamp = () => new Date().toISOString();
-
-const reindexWorkbookQuestions = (items: WorkbookQuestionRow[]) =>
-  items.map((item, index) => ({
-    ...item,
-    orderIndex: index + 1,
-  }));
 
 const modalBackdropStyle: CSSProperties = {
   alignItems: 'center',
@@ -100,11 +58,6 @@ const modalPanelStyle: CSSProperties = {
   width: 'min(720px, 100%)',
 };
 
-const getQuestionPreview = (question: QuestionRow) => {
-  const text = getQuestionText(question).trim();
-  return text.length > 90 ? `${text.slice(0, 90)}...` : text;
-};
-
 const questionContentStyle: CSSProperties = {
   color: '#172033',
   display: '-webkit-box',
@@ -118,99 +71,206 @@ const questionContentStyle: CSSProperties = {
   whiteSpace: 'normal',
 };
 
+const toQuestionRow = (question: QuestionApiItem): QuestionRow => ({
+  id: question.id,
+  subject: question.subject,
+  category: question.category ?? undefined,
+  difficulty: question.difficulty,
+  type: 'multiple_choice',
+  content: question.content,
+  choices: question.choices.map((choice) => choice.text),
+  correctAnswerIndex: question.correctAnswerIndex,
+  explanation: question.explanation ?? '',
+  status: question.status,
+  createdAt: question.createdAt,
+  updatedAt: question.updatedAt,
+});
+
+const toWorkbookTableRow = (
+  workbook: WorkbookApiItem,
+  selectedWorkbookId: string | null,
+  selectedTotalScore: number,
+): WorkbookTableRow => ({
+  id: workbook.id,
+  title: workbook.title,
+  description: workbook.description ?? '',
+  status: workbook.status,
+  passScore: workbook.passScore,
+  questionCount: workbook.questionCount ?? 0,
+  totalScore: workbook.id === selectedWorkbookId ? selectedTotalScore : undefined,
+  updatedAt: workbook.updatedAt,
+});
+
+const toWorkbookQuestionRow = (item: WorkbookQuestionApiItem): WorkbookQuestionRow => ({
+  id: item.id,
+  questionId: item.questionId,
+  sequence: item.sequence,
+  points: item.points,
+  isRequired: item.isRequired,
+  questionContent: item.question?.content,
+});
+
+const toWorkbookPayload = (values: WorkbookFormValues): WorkbookPayload => ({
+  title: values.title.trim(),
+  description: values.description.trim() || null,
+  status: values.status,
+  passScore: Math.min(100, Math.max(0, values.passScore)),
+});
+
+const getQuestionPreview = (content: string) => {
+  const text = content.trim() || '문제 내용 없음';
+  return text.length > 90 ? `${text.slice(0, 90)}...` : text;
+};
+
+const reindexQuestions = (items: WorkbookQuestionRow[]) =>
+  items.map((item, index) => ({
+    ...item,
+    sequence: index + 1,
+  }));
+
 export function WorkbookPage() {
-  const [workbooks, setWorkbooks] = useState<WorkbookRow[]>(initialWorkbooks);
-  const [workbookQuestions, setWorkbookQuestions] = useState<WorkbookQuestionRow[]>(initialWorkbookQuestions);
-  const [selectedWorkbookId, setSelectedWorkbookId] = useState<string | null>(initialWorkbooks[0]?.id ?? null);
+  const [workbooks, setWorkbooks] = useState<WorkbookApiItem[]>([]);
+  const [selectedWorkbook, setSelectedWorkbook] = useState<WorkbookApiItem | null>(null);
+  const [selectedWorkbookId, setSelectedWorkbookId] = useState<string | null>(null);
+  const [selectedItems, setSelectedItems] = useState<WorkbookQuestionRow[]>([]);
   const [workbookKeyword, setWorkbookKeyword] = useState('');
+  const [workbookStatus, setWorkbookStatus] = useState<ContentStatus | 'all'>('all');
+  const [workbookPage, setWorkbookPage] = useState(1);
+  const [workbookTotalItems, setWorkbookTotalItems] = useState(0);
+  const [questions, setQuestions] = useState<QuestionRow[]>([]);
+  const [questionSubjects, setQuestionSubjects] = useState<string[]>([]);
   const [questionKeyword, setQuestionKeyword] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   const [difficultyFilter, setDifficultyFilter] = useState<Difficulty | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<ContentStatus | 'all'>('all');
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
   const [editingWorkbookId, setEditingWorkbookId] = useState<string | null>(null);
-
-  const selectedWorkbook = useMemo(
-    () => workbooks.find((workbook) => workbook.id === selectedWorkbookId) ?? null,
-    [selectedWorkbookId, workbooks],
-  );
-
-  const selectedItems = useMemo(
-    () =>
-      workbookQuestions
-        .filter((item) => item.workbookId === selectedWorkbookId)
-        .sort((first, second) => first.orderIndex - second.orderIndex),
-    [selectedWorkbookId, workbookQuestions],
-  );
+  const [isWorkbookLoading, setIsWorkbookLoading] = useState(false);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [isQuestionLoading, setIsQuestionLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const selectedQuestionIds = useMemo(
     () => new Set(selectedItems.map((item) => item.questionId)),
     [selectedItems],
   );
+  const questionById = useMemo(() => new Map(questions.map((question) => [question.id, question])), [questions]);
+  const selectedTotalScore = selectedItems.reduce((sum, item) => sum + item.points, 0);
+  const workbookTotalPages = Math.max(1, Math.ceil(workbookTotalItems / WORKBOOK_PAGE_SIZE));
+  const workbookCurrentPage = Math.min(workbookPage, workbookTotalPages);
 
-  const workbookTableRows = useMemo<WorkbookTableRow[]>(() => {
-    const normalizedKeyword = workbookKeyword.trim().toLowerCase();
+  const workbookTableRows = useMemo(
+    () => workbooks.map((workbook) => toWorkbookTableRow(workbook, selectedWorkbookId, selectedTotalScore)),
+    [selectedTotalScore, selectedWorkbookId, workbooks],
+  );
 
-    return workbooks
-      .map((workbook) => {
-        const items = workbookQuestions.filter((item) => item.workbookId === workbook.id);
-        const totalScore = items.reduce((sum, item) => sum + item.score, 0);
+  const editingWorkbook = workbooks.find((workbook) => workbook.id === editingWorkbookId) ?? selectedWorkbook;
+  const formInitialValues: WorkbookFormValues | undefined =
+    formMode === 'edit' && editingWorkbook
+      ? {
+          title: editingWorkbook.title,
+          description: editingWorkbook.description ?? '',
+          status: editingWorkbook.status,
+          passScore: editingWorkbook.passScore,
+        }
+      : undefined;
 
-        return {
-          ...workbook,
-          questionCount: items.length,
-          totalScore,
-        };
-      })
-      .filter((workbook) => {
-        if (!normalizedKeyword) return true;
+  const loadWorkbooks = useCallback(async (nextPage = workbookPage) => {
+    setIsWorkbookLoading(true);
+    setErrorMessage('');
 
-        return [workbook.title, workbook.description ?? '', workbook.status]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedKeyword);
+    try {
+      const response = await workbookApi.list({
+        page: nextPage,
+        limit: WORKBOOK_PAGE_SIZE,
+        keyword: workbookKeyword,
+        status: workbookStatus === 'all' ? undefined : workbookStatus,
       });
-  }, [workbookKeyword, workbookQuestions, workbooks]);
 
-  const questionSubjects = useMemo(
-    () => Array.from(new Set(questions.map((question) => question.subject))).sort(),
-    [],
-  );
+      setWorkbooks(response.data);
+      setWorkbookTotalItems(response.meta.total);
+      setSelectedWorkbookId((current) => current ?? response.data[0]?.id ?? null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '문제집 목록을 불러오지 못했습니다.');
+      setWorkbooks([]);
+      setWorkbookTotalItems(0);
+    } finally {
+      setIsWorkbookLoading(false);
+    }
+  }, [workbookKeyword, workbookPage, workbookStatus]);
 
-  const questionCategories = useMemo(
-    () => Array.from(new Set(questions.map((question) => question.category).filter(Boolean) as string[])).sort(),
-    [],
-  );
+  const loadWorkbookDetail = useCallback(async (workbookId: string) => {
+    setIsDetailLoading(true);
+    setErrorMessage('');
 
-  const filteredQuestions = useMemo(() => {
-    const normalizedKeyword = questionKeyword.trim().toLowerCase();
+    try {
+      const response = await workbookApi.get(workbookId);
+      setSelectedWorkbook(response.data);
+      setSelectedItems((response.data.questions ?? []).map(toWorkbookQuestionRow));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '문제집 상세를 불러오지 못했습니다.');
+      setSelectedWorkbook(null);
+      setSelectedItems([]);
+    } finally {
+      setIsDetailLoading(false);
+    }
+  }, []);
 
-    return questions.filter((question) => {
-      const matchesKeyword =
-        !normalizedKeyword ||
-        [getQuestionText(question), question.subject, question.category ?? '', question.difficulty, question.status]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedKeyword);
-      const matchesSubject = subjectFilter === 'all' || question.subject === subjectFilter;
-      const matchesCategory = categoryFilter === 'all' || question.category === categoryFilter;
-      const matchesDifficulty = difficultyFilter === 'all' || question.difficulty === difficultyFilter;
-      const matchesStatus = statusFilter === 'all' || question.status === statusFilter;
+  const loadQuestions = useCallback(async () => {
+    setIsQuestionLoading(true);
+    setErrorMessage('');
 
-      return matchesKeyword && matchesSubject && matchesCategory && matchesDifficulty && matchesStatus;
+    try {
+      const response = await questionApi.list({
+        page: 1,
+        limit: QUESTION_LIMIT,
+        keyword: questionKeyword,
+        subject: subjectFilter === 'all' ? undefined : subjectFilter,
+        difficulty: difficultyFilter === 'all' ? undefined : difficultyFilter,
+        type: 'multiple_choice',
+      });
+
+      setQuestions(response.data.map(toQuestionRow));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '문제은행을 불러오지 못했습니다.');
+      setQuestions([]);
+    } finally {
+      setIsQuestionLoading(false);
+    }
+  }, [difficultyFilter, questionKeyword, subjectFilter]);
+
+  const loadQuestionSubjects = useCallback(async () => {
+    const response = await questionApi.list({
+      page: 1,
+      limit: QUESTION_LIMIT,
+      type: 'multiple_choice',
     });
-  }, [categoryFilter, difficultyFilter, questionKeyword, statusFilter, subjectFilter]);
 
-  const selectedTotalScore = selectedItems.reduce((sum, item) => sum + item.score, 0);
-  const editingWorkbook = workbooks.find((workbook) => workbook.id === editingWorkbookId) ?? null;
-  const formInitialValues: WorkbookFormValues | undefined = editingWorkbook
-    ? {
-        title: editingWorkbook.title,
-        description: editingWorkbook.description ?? '',
-        status: editingWorkbook.status,
-      }
-    : undefined;
+    setQuestionSubjects(Array.from(new Set(response.data.map((question) => question.subject))).sort());
+  }, []);
+
+  useEffect(() => {
+    void loadWorkbooks();
+  }, [loadWorkbooks]);
+
+  useEffect(() => {
+    if (selectedWorkbookId) {
+      void loadWorkbookDetail(selectedWorkbookId);
+    } else {
+      setSelectedWorkbook(null);
+      setSelectedItems([]);
+    }
+  }, [loadWorkbookDetail, selectedWorkbookId]);
+
+  useEffect(() => {
+    void loadQuestions();
+  }, [loadQuestions]);
+
+  useEffect(() => {
+    loadQuestionSubjects().catch((error) => {
+      setErrorMessage(error instanceof Error ? error.message : '문제 과목 목록을 불러오지 못했습니다.');
+    });
+  }, [loadQuestionSubjects]);
 
   const openCreateForm = () => {
     setEditingWorkbookId(null);
@@ -227,112 +287,135 @@ export function WorkbookPage() {
     setFormMode(null);
   };
 
-  const submitWorkbook = (values: WorkbookFormValues) => {
-    const now = createTimestamp();
+  const submitWorkbook = async (values: WorkbookFormValues) => {
+    setIsSubmitting(true);
+    setErrorMessage('');
 
-    if (formMode === 'create') {
-      const workbookId = `workbook-${now.replace(/[-:.TZ]/g, '').slice(0, 14)}`;
-      const nextWorkbook: WorkbookRow = {
-        id: workbookId,
-        createdBy: 'user-teacher-1',
-        title: values.title,
-        description: values.description,
-        status: values.status,
-        createdAt: now,
-        updatedAt: now,
-        deletedAt: null,
-      };
+    try {
+      if (formMode === 'create') {
+        const response = await workbookApi.create(toWorkbookPayload(values));
+        closeForm();
+        setWorkbookPage(1);
+        setSelectedWorkbookId(response.data.id);
+        await loadWorkbooks(1);
+        return;
+      }
 
-      setWorkbooks((current) => [nextWorkbook, ...current]);
-      setSelectedWorkbookId(workbookId);
+      if (!editingWorkbookId) return;
+
+      await workbookApi.update(editingWorkbookId, toWorkbookPayload(values));
       closeForm();
-      return;
+      await Promise.all([loadWorkbooks(), loadWorkbookDetail(editingWorkbookId)]);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '문제집을 저장하지 못했습니다.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (!editingWorkbookId) return;
-
-    setWorkbooks((current) =>
-      current.map((workbook) =>
-        workbook.id === editingWorkbookId
-          ? {
-              ...workbook,
-              title: values.title,
-              description: values.description,
-              status: values.status,
-              updatedAt: now,
-            }
-          : workbook,
-      ),
-    );
-    closeForm();
   };
 
-  const deleteWorkbook = (workbookId: string) => {
-    setWorkbooks((current) => current.filter((workbook) => workbook.id !== workbookId));
-    setWorkbookQuestions((current) => current.filter((item) => item.workbookId !== workbookId));
-    setSelectedWorkbookId((current) => {
-      if (current !== workbookId) return current;
-      return workbooks.find((workbook) => workbook.id !== workbookId)?.id ?? null;
-    });
+  const deleteWorkbook = async (workbookId: string) => {
+    const target = workbooks.find((workbook) => workbook.id === workbookId);
+    const confirmed = window.confirm(`${target?.title ?? '선택한 문제집'}을 삭제할까요?`);
+    if (!confirmed) return;
+
+    setIsSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      await workbookApi.delete(workbookId);
+      setSelectedWorkbookId((current) => (current === workbookId ? null : current));
+      await loadWorkbooks(1);
+      setWorkbookPage(1);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '문제집을 삭제하지 못했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const addQuestion = (questionId: string) => {
-    if (!selectedWorkbookId) return;
+  const addQuestion = (question: QuestionRow) => {
+    if (!selectedWorkbook || selectedQuestionIds.has(question.id) || question.status !== 'published') return;
 
-    setWorkbookQuestions((current) => {
-      const currentItems = current
-        .filter((item) => item.workbookId === selectedWorkbookId)
-        .sort((first, second) => first.orderIndex - second.orderIndex);
-
-      if (currentItems.some((item) => item.questionId === questionId)) return current;
-
-      const now = createTimestamp();
-      const nextItem: WorkbookQuestionRow = {
-        id: `wq-${selectedWorkbookId}-${questionId}-${currentItems.length + 1}`,
-        workbookId: selectedWorkbookId,
-        questionId,
-        orderIndex: currentItems.length + 1,
-        score: 10,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      return [...current, nextItem];
-    });
+    setSelectedItems((current) => [
+      ...current,
+      {
+        id: `draft-${question.id}`,
+        questionId: question.id,
+        sequence: current.length + 1,
+        points: 10,
+        isRequired: true,
+        questionContent: question.content,
+      },
+    ]);
   };
 
   const removeQuestion = (questionId: string) => {
-    if (!selectedWorkbookId) return;
-
-    setWorkbookQuestions((current) => {
-      const otherItems = current.filter((item) => item.workbookId !== selectedWorkbookId);
-      const nextItems = current.filter(
-        (item) => item.workbookId === selectedWorkbookId && item.questionId !== questionId,
-      );
-
-      return [...otherItems, ...reindexWorkbookQuestions(nextItems)];
-    });
+    setSelectedItems((current) => reindexQuestions(current.filter((item) => item.questionId !== questionId)));
   };
 
   const moveQuestion = (questionId: string, direction: -1 | 1) => {
-    if (!selectedWorkbookId) return;
-
-    setWorkbookQuestions((current) => {
-      const otherItems = current.filter((item) => item.workbookId !== selectedWorkbookId);
-      const currentItems = current
-        .filter((item) => item.workbookId === selectedWorkbookId)
-        .sort((first, second) => first.orderIndex - second.orderIndex);
-      const currentIndex = currentItems.findIndex((item) => item.questionId === questionId);
+    setSelectedItems((current) => {
+      const currentIndex = current.findIndex((item) => item.questionId === questionId);
       const nextIndex = currentIndex + direction;
 
-      if (currentIndex < 0 || nextIndex < 0 || nextIndex >= currentItems.length) return current;
+      if (currentIndex < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
 
-      const nextItems = [...currentItems];
+      const nextItems = [...current];
       const [target] = nextItems.splice(currentIndex, 1);
       nextItems.splice(nextIndex, 0, target);
 
-      return [...otherItems, ...reindexWorkbookQuestions(nextItems)];
+      return reindexQuestions(nextItems);
     });
+  };
+
+  const updateQuestionConfig = (questionId: string, patch: Partial<Pick<WorkbookQuestionRow, 'points' | 'isRequired'>>) => {
+    setSelectedItems((current) =>
+      current.map((item) =>
+        item.questionId === questionId
+          ? {
+              ...item,
+              ...patch,
+            }
+          : item,
+      ),
+    );
+  };
+
+  const saveWorkbookQuestions = async () => {
+    if (!selectedWorkbookId) return;
+
+    setIsSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      await workbookApi.updateQuestions(selectedWorkbookId, {
+        questions: selectedItems.map((item, index) => ({
+          questionId: item.questionId,
+          sequence: index + 1,
+          points: item.points,
+          isRequired: item.isRequired,
+        })),
+      });
+      await Promise.all([loadWorkbookDetail(selectedWorkbookId), loadWorkbooks()]);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '문제집 문항 구성을 저장하지 못했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleWorkbookKeywordChange = (value: string) => {
+    setWorkbookKeyword(value);
+    setWorkbookPage(1);
+  };
+
+  const handleWorkbookStatusChange = (value: ContentStatus | 'all') => {
+    setWorkbookStatus(value);
+    setWorkbookPage(1);
+  };
+
+  const handleQuestionKeywordChange = (value: string) => {
+    setQuestionKeyword(value);
   };
 
   const handleDragStart = (event: DragEvent<HTMLElement>, questionId: string) => {
@@ -343,12 +426,18 @@ export function WorkbookPage() {
   const handleDrop = (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
     const questionId = event.dataTransfer.getData('text/plain');
-    if (questionId) addQuestion(questionId);
+    const question = questions.find((item) => item.id === questionId);
+    if (question) addQuestion(question);
   };
 
   const handleDragOver = (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
+  };
+
+  const resolveQuestionContent = (item: WorkbookQuestionRow) => {
+    const question = questionById.get(item.questionId);
+    return question?.content ?? item.questionContent ?? '문제 내용 없음';
   };
 
   return (
@@ -358,10 +447,12 @@ export function WorkbookPage() {
           <p className="eyebrow">Workbook Management</p>
           <h1>문제집관리</h1>
         </div>
-        <button className="primary-button" type="button" onClick={openCreateForm}>
+        <button className="primary-button" type="button" onClick={openCreateForm} disabled={isSubmitting}>
           문제집 추가
         </button>
       </section>
+
+      {errorMessage ? <p className="table-subtitle">{errorMessage}</p> : null}
 
       {formMode ? (
         <div aria-modal="true" role="dialog" style={modalBackdropStyle}>
@@ -373,8 +464,9 @@ export function WorkbookPage() {
               </div>
             </div>
             <WorkbookForm
-              key={editingWorkbookId ?? 'create'}
+              disabled={isSubmitting}
               initialValues={formInitialValues}
+              key={editingWorkbookId ?? 'create'}
               mode={formMode}
               onCancel={closeForm}
               onSubmit={submitWorkbook}
@@ -395,17 +487,38 @@ export function WorkbookPage() {
             <span>검색</span>
             <input
               value={workbookKeyword}
-              onChange={(event) => setWorkbookKeyword(event.target.value)}
-              placeholder="문제집명, 설명, 상태 검색"
+              onChange={(event) => handleWorkbookKeywordChange(event.target.value)}
+              placeholder="문제집명, 설명 검색"
             />
           </label>
+          <label className="search-field">
+            <span>상태</span>
+            <select
+              value={workbookStatus}
+              onChange={(event) => handleWorkbookStatusChange(event.target.value as ContentStatus | 'all')}
+            >
+              <option value="all">전체 상태</option>
+              {WorkbookStatusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+        {isWorkbookLoading ? <p className="table-subtitle">문제집 목록을 불러오는 중입니다.</p> : null}
         <WorkbookTable
           selectedWorkbookId={selectedWorkbookId}
           workbooks={workbookTableRows}
           onDelete={deleteWorkbook}
           onEdit={openEditForm}
           onSelect={setSelectedWorkbookId}
+        />
+        <Pagination
+          currentPage={workbookCurrentPage}
+          totalItems={workbookTotalItems}
+          totalPages={workbookTotalPages}
+          onPageChange={setWorkbookPage}
         />
       </section>
 
@@ -423,8 +536,8 @@ export function WorkbookPage() {
               <span>검색</span>
               <input
                 value={questionKeyword}
-                onChange={(event) => setQuestionKeyword(event.target.value)}
-                placeholder="문제 내용, 과목, 카테고리, 난이도, 상태 검색"
+                onChange={(event) => handleQuestionKeywordChange(event.target.value)}
+                placeholder="문제 내용, 과목, 카테고리 검색"
               />
             </label>
             <label className="search-field">
@@ -434,17 +547,6 @@ export function WorkbookPage() {
                 {questionSubjects.map((subject) => (
                   <option key={subject} value={subject}>
                     {subject}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="search-field">
-              <span>카테고리</span>
-              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-                <option value="all">전체</option>
-                {questionCategories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
                   </option>
                 ))}
               </select>
@@ -461,49 +563,40 @@ export function WorkbookPage() {
                 <option value="hard">어려움</option>
               </select>
             </label>
-            <label className="search-field">
-              <span>상태</span>
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as ContentStatus | 'all')}
-              >
-                <option value="all">전체</option>
-                <option value="draft">초안</option>
-                <option value="published">게시</option>
-                <option value="archived">보관</option>
-              </select>
-            </label>
           </div>
 
+          {isQuestionLoading ? <p className="table-subtitle">문제은행을 불러오는 중입니다.</p> : null}
           <div className="question-list">
-            {filteredQuestions.map((question) => {
+            {questions.map((question) => {
               const isSelected = selectedQuestionIds.has(question.id);
+              const canAdd = Boolean(selectedWorkbook) && !isSelected && question.status === 'published';
 
               return (
                 <article
                   className={`question-card ${isSelected ? 'is-selected' : ''}`}
-                  draggable
+                  draggable={canAdd}
                   key={question.id}
                   onDragStart={(event) => handleDragStart(event, question.id)}
                 >
                   <div>
-                    <div style={questionContentStyle}>{getQuestionPreview(question)}</div>
+                    <div style={questionContentStyle}>{getQuestionPreview(question.content)}</div>
                     <span className="question-meta">
-                      {question.subject} | {question.category ?? '미분류'} | {difficultyLabels[question.difficulty]}
+                      {question.subject} | {question.category ?? '미분류'} | {difficultyLabels[question.difficulty]} |{' '}
+                      {QuestionStatusLabel[question.status]}
                     </span>
                   </div>
                   <button
                     className="text-button"
                     type="button"
-                    onClick={() => addQuestion(question.id)}
-                    disabled={!selectedWorkbook || isSelected}
+                    onClick={() => addQuestion(question)}
+                    disabled={!canAdd}
                   >
-                    {isSelected ? '추가됨' : '추가'}
+                    {isSelected ? '추가됨' : question.status === 'published' ? '추가' : '추가 불가'}
                   </button>
                 </article>
               );
             })}
-            {filteredQuestions.length === 0 ? (
+            {questions.length === 0 ? (
               <div className="empty-drop">
                 <strong>조건에 맞는 문제가 없습니다.</strong>
                 <p>검색어 또는 필터를 변경해보세요.</p>
@@ -521,13 +614,16 @@ export function WorkbookPage() {
             <div className="workbook-summary">
               <strong>{selectedItems.length}문항 선택</strong>
               <span>{selectedTotalScore}점</span>
+              {selectedWorkbook ? <span>합격 {selectedWorkbook.passScore}점</span> : null}
               {selectedWorkbook ? (
                 <span className={`status-pill status-${selectedWorkbook.status}`}>
-                  {statusLabels[selectedWorkbook.status]}
+                  {WorkbookStatusLabel[selectedWorkbook.status]}
                 </span>
               ) : null}
             </div>
           </div>
+
+          {isDetailLoading ? <p className="table-subtitle">문제집 상세를 불러오는 중입니다.</p> : null}
 
           <div className="drop-zone">
             {!selectedWorkbook ? (
@@ -538,25 +634,48 @@ export function WorkbookPage() {
             ) : selectedItems.length === 0 ? (
               <div className="empty-drop">
                 <strong>문제를 여기에 놓으세요.</strong>
-                <p>좌측 문제은행에서 문제를 드래그하거나 추가 버튼을 누르면 문제집에 포함됩니다.</p>
+                <p>좌측 문제은행에서 사용중 문제를 드래그하거나 추가 버튼을 누르면 문제집에 포함됩니다.</p>
               </div>
             ) : (
               selectedItems.map((item, index) => {
-                const question = questions.find((entry) => entry.id === item.questionId);
-                if (!question) return null;
+                const question = questionById.get(item.questionId);
 
                 return (
                   <article className="workbook-question" key={item.id}>
                     <div className="sequence-badge">{index + 1}</div>
                     <div className="workbook-question-body">
-                      <div style={questionContentStyle}>{getQuestionPreview(question)}</div>
+                      <div style={questionContentStyle}>{getQuestionPreview(resolveQuestionContent(item))}</div>
                       <span className="question-meta">
-                        {question.subject} · {question.category ?? '미분류'} ·{' '}
-                        {difficultyLabels[question.difficulty]}
+                        {question
+                          ? `${question.subject} · ${question.category ?? '미분류'} · ${difficultyLabels[question.difficulty]}`
+                          : '상세 문제 정보는 문제은행 조회 후 표시됩니다.'}
                       </span>
-                      <p>{item.score}점 · 정답 보기 {question.correctAnswerIndex + 1}</p>
+                      <p>정답 보기 {question ? question.correctAnswerIndex + 1 : '-'}</p>
                     </div>
                     <div className="workbook-actions">
+                      <label className="search-field">
+                        <span>점수</span>
+                        <input
+                          min={0}
+                          type="number"
+                          value={item.points}
+                          onChange={(event) =>
+                            updateQuestionConfig(item.questionId, { points: Number(event.target.value) })
+                          }
+                        />
+                      </label>
+                      <label className="search-field">
+                        <span>필수</span>
+                        <select
+                          value={item.isRequired ? 'true' : 'false'}
+                          onChange={(event) =>
+                            updateQuestionConfig(item.questionId, { isRequired: event.target.value === 'true' })
+                          }
+                        >
+                          <option value="true">필수</option>
+                          <option value="false">선택</option>
+                        </select>
+                      </label>
                       <button
                         className="secondary-button"
                         type="button"
@@ -582,6 +701,14 @@ export function WorkbookPage() {
               })
             )}
           </div>
+
+          {selectedWorkbook ? (
+            <div className="form-actions">
+              <button className="primary-button" type="button" onClick={saveWorkbookQuestions} disabled={isSubmitting}>
+                {isSubmitting ? '저장 중...' : '문항 구성 저장'}
+              </button>
+            </div>
+          ) : null}
         </main>
       </section>
     </div>
