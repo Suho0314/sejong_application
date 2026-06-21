@@ -2,7 +2,7 @@
 
 ## 목적
 
-`backend` 폴더는 강사용 웹과 학생 앱이 공통으로 사용할 API 서버다. 현재 단계에서는 실제 도메인 API를 구현하지 않고, NestJS 서버 실행 구조와 PostgreSQL/Supabase 연결 준비만 구성한다.
+`backend` 폴더는 강사용 웹과 학생 앱이 공통으로 사용할 NestJS API 서버다. PostgreSQL 연결, Health Check, 강사·학생 로그인과 JWT access token 발급을 제공한다.
 
 ## 생성 구조
 
@@ -23,6 +23,12 @@ backend/
       database.constants.ts
       database.module.ts
       database.service.ts
+    auth/
+      dto/login.dto.ts
+      auth.controller.ts
+      auth.module.ts
+      auth.service.ts
+      auth.types.ts
     health/
       health.controller.ts
       health.module.ts
@@ -36,6 +42,8 @@ backend/
 - PostgreSQL
 - Supabase PostgreSQL
 - `pg` connection pool
+- `bcrypt` 비밀번호 해시 검증
+- JWT access token
 
 ## 환경 변수
 
@@ -56,6 +64,7 @@ cp .env.example .env
 | `SUPABASE_URL` | Supabase 프로젝트 URL |
 | `SUPABASE_ANON_KEY` | Supabase 클라이언트용 anon key |
 | `JWT_SECRET` | JWT 서명용 secret |
+| `JWT_ACCESS_TOKEN_TTL_SECONDS` | access token 유효시간(초, 기본값 `3600`) |
 
 ## PostgreSQL 연결
 
@@ -97,8 +106,6 @@ http://localhost:3000
 
 ## Health Check
 
-현재 제공하는 API는 Health Check 하나다.
-
 | Method | URL | 설명 |
 | --- | --- | --- |
 | `GET` | `/api/health` | API 서버 동작 확인 |
@@ -113,6 +120,49 @@ http://localhost:3000
 }
 ```
 
+## Auth API
+
+| Method | URL | 허용 role |
+| --- | --- | --- |
+| `POST` | `/api/auth/teacher/login` | `teacher` |
+| `POST` | `/api/auth/student/login` | `student` |
+
+두 API 모두 `loginId` 또는 `email`과 `password`를 받는다. `users.password_hash`는 bcrypt 해시여야 하며, 사용자 및 역할별 프로필의 `deleted_at`이 `NULL`인 계정만 로그인할 수 있다.
+
+강사 로그인 예시:
+
+```bash
+curl -i -X POST http://localhost:3000/api/auth/teacher/login \
+  -H "Content-Type: application/json" \
+  -d '{"loginId":"teacher1","password":"teacher-password"}'
+```
+
+학생 로그인 예시:
+
+```bash
+curl -i -X POST http://localhost:3000/api/auth/student/login \
+  -H "Content-Type: application/json" \
+  -d '{"loginId":"student1","password":"student-password"}'
+```
+
+성공 시 응답의 `data.accessToken`에 JWT가 반환된다. 잘못된 비밀번호, 다른 role, 삭제·비활성 계정은 계정 존재 여부를 노출하지 않고 `401 Unauthorized`를 반환한다.
+
+### 테스트 계정 비밀번호 준비
+
+`database/seed.sql`의 `$seed$...` 값은 예시 자리표시자이며 bcrypt 해시가 아니다. 로컬 테스트 전 PostgreSQL `pgcrypto`로 테스트 계정의 bcrypt 해시를 설정할 수 있다.
+
+```sql
+UPDATE users
+SET password_hash = crypt('teacher-password', gen_salt('bf'))
+WHERE login_id = 'teacher1';
+
+UPDATE users
+SET password_hash = crypt('student-password', gen_salt('bf'))
+WHERE login_id = 'student1';
+```
+
+운영 비밀번호를 SQL이나 저장소에 평문으로 저장하지 않는다.
+
 ## DB 스키마 적용
 
 ```bash
@@ -126,11 +176,14 @@ psql "$DATABASE_URL" -f backend/database/seed.sql
 - `DATABASE_URL` 기반 DB 연결 준비
 - Supabase PostgreSQL SSL 연결 준비
 - `GET /api/health` 추가
-- 실제 로그인, 기수, 학생, 문제, 문제집, 제출, 성적 API는 아직 구현하지 않음
+- `POST /api/auth/teacher/login` 추가
+- `POST /api/auth/student/login` 추가
+- bcrypt 비밀번호 검증과 JWT access token 발급
+- 기수, 학생, 문제, 문제집, 제출, 성적 API는 아직 구현하지 않음
 
 ## 다음 작업
 
-1. 인증 모듈 생성
-2. 공통 응답/에러 포맷 정의
+1. refresh token 재발급·로그아웃 구현
+2. JWT 인증 Guard와 role Guard 구현
 3. `docs/API.md` 기준으로 도메인 모듈 분리
 4. DB migration 도구 도입 검토
