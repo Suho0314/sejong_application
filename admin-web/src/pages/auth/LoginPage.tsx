@@ -58,6 +58,7 @@ export function LoginPage() {
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [findMode, setFindMode] = useState<FindMode | null>(null);
   const [securityAnswer, setSecurityAnswer] = useState('');
   const [findError, setFindError] = useState('');
@@ -81,17 +82,19 @@ export function LoginPage() {
     setFindResult('');
   };
 
-  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const session = loginAdmin(id, password);
-
-    if (!session) {
-      setLoginError('ID 또는 Password가 올바르지 않습니다.');
-      return;
-    }
-
+    setIsLoggingIn(true);
     setLoginError('');
-    navigate(redirectTo, { replace: true });
+
+    try {
+      await loginAdmin(id, password);
+      navigate(redirectTo, { replace: true });
+    } catch {
+      setLoginError('ID 또는 Password가 올바르지 않습니다.');
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   const handleFindAccount = (event: FormEvent<HTMLFormElement>) => {
@@ -123,22 +126,22 @@ export function LoginPage() {
 
         <form className="cohort-form" onSubmit={handleLogin}>
           <label>
-            <span>ID</span>
-            <input value={id} onChange={(event) => setId(event.target.value)} placeholder="admin" required />
+            <span>ID 또는 Email</span>
+            <input value={id} onChange={(event) => setId(event.target.value)} placeholder="teacher1" required />
           </label>
           <label>
             <span>Password</span>
             <input
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="1234"
+              placeholder="teacher-1234"
               required
               type="password"
             />
           </label>
           {loginError ? <p style={errorTextStyle}>{loginError}</p> : null}
-          <button className="primary-button" type="submit">
-            로그인
+          <button className="primary-button" disabled={isLoggingIn} type="submit">
+            {isLoggingIn ? '로그인 중...' : '로그인'}
           </button>
           <div className="form-actions">
             <button className="text-button" type="button" onClick={() => openFindModal('id')}>

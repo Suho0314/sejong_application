@@ -1,12 +1,34 @@
 import { adminAccount } from '../mock/adminAccount';
+import { apiRequest } from '../api';
 
 const AUTH_STORAGE_KEY = 'sejong_admin_auth';
+const ACCESS_TOKEN_STORAGE_KEY = 'sejong_admin_access_token';
+const USER_STORAGE_KEY = 'sejong_admin_user';
 const ACCOUNT_STORAGE_KEY = 'sejong_admin_account';
 
 export type AdminSession = {
   id: string;
   name: string;
+  loginId: string;
+  email: string | null;
+  role: 'admin' | 'teacher';
+  teacherId?: string;
+  accessToken: string;
   loggedInAt: string;
+};
+
+type TeacherLoginResponse = {
+  data: {
+    accessToken: string;
+    user: {
+      id: string;
+      role: 'teacher';
+      name: string;
+      loginId: string;
+      email: string | null;
+      teacherId?: string;
+    };
+  };
 };
 
 export type AdminAccount = {
@@ -51,19 +73,32 @@ const syncSessionId = (id: string) => {
 };
 
 export const loginAdmin = (id: string, password: string) => {
-  const account = getAdminAccount();
-  const isValid = id.trim() === account.id && password === account.password;
+  const identifier = id.trim();
+  const credentials = identifier.includes('@')
+    ? { email: identifier, password }
+    : { loginId: identifier, password };
 
-  if (!isValid) return null;
+  return apiRequest<TeacherLoginResponse>('/auth/teacher/login', {
+    auth: false,
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  }).then(({ data }) => {
+    const session: AdminSession = {
+      id: data.user.id,
+      name: data.user.name,
+      loginId: data.user.loginId,
+      email: data.user.email,
+      role: data.user.role,
+      teacherId: data.user.teacherId,
+      accessToken: data.accessToken,
+      loggedInAt: new Date().toISOString(),
+    };
 
-  const session: AdminSession = {
-    id: account.id,
-    name: account.name,
-    loggedInAt: new Date().toISOString(),
-  };
-
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
-  return session;
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+    localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, data.accessToken);
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+    return session;
+  });
 };
 
 export const getAdminSession = (): AdminSession | null => {
@@ -71,17 +106,22 @@ export const getAdminSession = (): AdminSession | null => {
   if (!rawSession) return null;
 
   try {
-    return JSON.parse(rawSession) as AdminSession;
+    const session = JSON.parse(rawSession) as AdminSession;
+    return session.accessToken ? session : null;
   } catch {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     return null;
   }
 };
 
-export const isAdminAuthenticated = () => Boolean(getAdminSession());
+export const getAccessToken = () => localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+
+export const isAdminAuthenticated = () => Boolean(getAccessToken() && getAdminSession());
 
 export const logoutAdmin = () => {
   localStorage.removeItem(AUTH_STORAGE_KEY);
+  localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+  localStorage.removeItem(USER_STORAGE_KEY);
 };
 
 export const findAdminId = (answer: string) => {
