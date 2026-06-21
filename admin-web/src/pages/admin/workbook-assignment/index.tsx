@@ -1,213 +1,272 @@
-import { useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { cohortApi, CohortApiItem } from '../../../api/cohorts';
+import { workbookAssignmentApi, WorkbookAssignmentApiItem } from '../../../api/workbookAssignments';
+import { workbookApi, WorkbookApiItem } from '../../../api/workbooks';
+import { Pagination } from '../../../components/admin/Pagination';
 import {
+  AssignmentDisplayStatus,
   WorkbookAssignmentTable,
   WorkbookAssignmentTableRow,
 } from '../../../components/admin/WorkbookAssignmentTable';
-import cohortsData from '../../../mock/cohorts.json';
-import workbookAssignmentsData from '../../../mock/workbookAssignments.json';
-import workbooksData from '../../../mock/workbooks.json';
-import { AssignmentStatus, CohortStatus, ContentStatus } from '../../../types/domain';
+import { WorkbookStatusLabel } from '../../../constants/statusLabels';
+import { AssignmentStatus } from '../../../types/domain';
 
-type WorkbookRow = {
-  id: string;
-  title: string;
-  description?: string;
-  status: ContentStatus;
-  questionCount?: number;
-  totalPoints?: number;
-};
+const PAGE_SIZE = 8;
+const OPTION_LIMIT = 100;
 
-type CohortRow = {
-  id: string;
-  name: string;
-  code: string;
-  description?: string;
-  status: CohortStatus;
-  studentCount: number;
-};
-
-type WorkbookAssignmentRow = {
-  id: string;
+type AssignmentFormValues = {
   workbookId: string;
+  workbookTitle: string;
   cohortId: string;
-  assignedBy: string;
-  assignedAt: string;
-  dueDate?: string | null;
-  status: AssignmentStatus;
-  createdAt: string;
-  updatedAt: string;
+  opensOn: string;
+  closesOn: string;
+  maxAttempts: number;
 };
 
-const workbooks = workbooksData.map((workbook) => ({
-  id: workbook.id,
-  title: workbook.title,
-  description: workbook.description,
-  status: workbook.status as ContentStatus,
-  questionCount: workbook.questionCount,
-  totalPoints: workbook.totalPoints,
-})) satisfies WorkbookRow[];
+const todayInputValue = () => new Date().toISOString().slice(0, 10);
 
-const cohorts = cohortsData.map((cohort) => ({
-  id: cohort.id,
-  name: cohort.name,
-  code: cohort.code,
-  description: cohort.description,
-  status: cohort.status as CohortStatus,
-  studentCount: cohort.studentCount,
-})) satisfies CohortRow[];
-
-const initialAssignments = workbookAssignmentsData as WorkbookAssignmentRow[];
-
-const workbookStatusLabels: Record<ContentStatus, string> = {
-  draft: '초안',
-  published: '게시',
-  archived: '보관',
+const defaultFormValues: AssignmentFormValues = {
+  workbookId: '',
+  workbookTitle: '',
+  cohortId: '',
+  opensOn: todayInputValue(),
+  closesOn: todayInputValue(),
+  maxAttempts: 1,
 };
 
-const cohortStatusLabels: Record<CohortStatus, string> = {
-  planned: '예정',
-  active: '진행중',
-  completed: '완료',
+const toStartIso = (value: string) => `${value}T00:00:00.000Z`;
+const toEndIso = (value: string) => `${value}T23:59:59.000Z`;
+const toDateInputValue = (value?: string | null) => (value ? value.slice(0, 10) : '');
+
+const getDateOnly = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+
+const getAssignmentDisplayStatus = (opensAt: string, closesAt?: string | null): AssignmentDisplayStatus => {
+  const today = getDateOnly(new Date());
+  const startsOn = getDateOnly(new Date(opensAt));
+  const endsOn = closesAt ? getDateOnly(new Date(closesAt)) : Number.POSITIVE_INFINITY;
+
+  if (today < startsOn) return 'scheduled';
+  if (today <= endsOn) return 'open';
+  return 'closed';
 };
 
-const assignmentStatusLabels: Record<AssignmentStatus, string> = {
-  active: '배포중',
-  closed: '종료',
+const getApiStatus = (opensOn: string, closesOn: string): AssignmentStatus => {
+  return getAssignmentDisplayStatus(toStartIso(opensOn), toEndIso(closesOn));
 };
 
-const toDateInputValue = (value: Date) => value.toISOString().slice(0, 10);
-
-const toDueDate = (value: string) => (value ? `${value}T14:59:59.000Z` : null);
-
-const formatDate = (value?: string | null) => {
-  if (!value) return '-';
-
-  return new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(value));
-};
+const toTableRow = (assignment: WorkbookAssignmentApiItem): WorkbookAssignmentTableRow => ({
+  id: assignment.id,
+  workbookTitle: assignment.workbook.title,
+  cohortName: assignment.cohort.name,
+  opensAt: assignment.opensAt,
+  closesAt: assignment.closesAt,
+  maxAttempts: assignment.maxAttempts,
+  submissionCount: assignment.submissionCount ?? 0,
+  apiStatus: assignment.status,
+  displayStatus: getAssignmentDisplayStatus(assignment.opensAt, assignment.closesAt),
+});
 
 export function WorkbookAssignmentPage() {
-  const [assignments, setAssignments] = useState<WorkbookAssignmentRow[]>(initialAssignments);
-  const [selectedWorkbookId, setSelectedWorkbookId] = useState(workbooks[0]?.id ?? '');
-  const [selectedCohortIds, setSelectedCohortIds] = useState<string[]>([]);
-  const [dueDate, setDueDate] = useState(toDateInputValue(new Date()));
+  const [assignments, setAssignments] = useState<WorkbookAssignmentApiItem[]>([]);
+  const [workbooks, setWorkbooks] = useState<WorkbookApiItem[]>([]);
+  const [cohorts, setCohorts] = useState<CohortApiItem[]>([]);
+  const [workbookId, setWorkbookId] = useState('all');
+  const [cohortId, setCohortId] = useState('all');
+  const [status, setStatus] = useState<AssignmentStatus | 'all'>('all');
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
+  const [formValues, setFormValues] = useState<AssignmentFormValues>(defaultFormValues);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOptionLoading, setIsOptionLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const selectedWorkbook = workbooks.find((workbook) => workbook.id === selectedWorkbookId) ?? null;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const assignmentTableRows = useMemo(() => assignments.map(toTableRow), [assignments]);
+  const selectedWorkbook = workbooks.find((workbook) => workbook.id === formValues.workbookId) ?? null;
+  const hasAssignableWorkbooks = workbooks.length > 0;
 
-  const selectedWorkbookAssignments = useMemo(
-    () =>
-      assignments
-        .filter((assignment) => assignment.workbookId === selectedWorkbookId)
-        .sort((first, second) => new Date(second.assignedAt).getTime() - new Date(first.assignedAt).getTime()),
-    [assignments, selectedWorkbookId],
-  );
+  const loadAssignments = useCallback(async (nextPage = page) => {
+    setIsLoading(true);
+    setErrorMessage('');
 
-  const activeAssignedCohortIds = useMemo(
-    () =>
-      new Set(
-        selectedWorkbookAssignments
-          .filter((assignment) => assignment.status === 'active')
-          .map((assignment) => assignment.cohortId),
-      ),
-    [selectedWorkbookAssignments],
-  );
-
-  const assignmentByCohort = useMemo(() => {
-    const result = new Map<string, WorkbookAssignmentRow>();
-
-    selectedWorkbookAssignments.forEach((assignment) => {
-      const previous = result.get(assignment.cohortId);
-      if (!previous || new Date(assignment.assignedAt) > new Date(previous.assignedAt)) {
-        result.set(assignment.cohortId, assignment);
-      }
-    });
-
-    return result;
-  }, [selectedWorkbookAssignments]);
-
-  const assignmentTableRows = useMemo<WorkbookAssignmentTableRow[]>(
-    () =>
-      assignments
-        .map((assignment) => {
-          const workbook = workbooks.find((item) => item.id === assignment.workbookId);
-          const cohort = cohorts.find((item) => item.id === assignment.cohortId);
-
-          return {
-            id: assignment.id,
-            workbookTitle: workbook?.title ?? '-',
-            cohortName: cohort?.name ?? '-',
-            cohortCode: cohort?.code ?? '-',
-            assignedAt: assignment.assignedAt,
-            dueDate: assignment.dueDate,
-            status: assignment.status,
-          };
-        })
-        .sort((first, second) => new Date(second.assignedAt).getTime() - new Date(first.assignedAt).getTime()),
-    [assignments],
-  );
-
-  const toggleCohort = (cohortId: string) => {
-    if (activeAssignedCohortIds.has(cohortId)) return;
-
-    setSelectedCohortIds((current) =>
-      current.includes(cohortId) ? current.filter((id) => id !== cohortId) : [...current, cohortId],
-    );
-  };
-
-  const distributeWorkbook = () => {
-    if (!selectedWorkbookId || selectedCohortIds.length === 0) return;
-
-    const now = new Date().toISOString();
-    const nextDueDate = toDueDate(dueDate);
-
-    setAssignments((current) => {
-      const nextAssignments = [...current];
-
-      selectedCohortIds.forEach((cohortId, index) => {
-        const activeAssignment = nextAssignments.find(
-          (assignment) =>
-            assignment.workbookId === selectedWorkbookId &&
-            assignment.cohortId === cohortId &&
-            assignment.status === 'active',
-        );
-
-        if (activeAssignment) return;
-
-        nextAssignments.push({
-          id: `assignment-${selectedWorkbookId}-${cohortId}-${Date.now()}-${index + 1}`,
-          workbookId: selectedWorkbookId,
-          cohortId,
-          assignedBy: 'user-teacher-1',
-          assignedAt: now,
-          dueDate: nextDueDate,
-          status: 'active',
-          createdAt: now,
-          updatedAt: now,
-        });
+    try {
+      const response = await workbookAssignmentApi.list({
+        page: nextPage,
+        limit: PAGE_SIZE,
+        workbookId: workbookId === 'all' ? undefined : workbookId,
+        cohortId: cohortId === 'all' ? undefined : cohortId,
+        status: status === 'all' ? undefined : status,
       });
 
-      return nextAssignments;
+      setAssignments(response.data);
+      setTotalItems(response.meta.total);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '배포 목록을 불러오지 못했습니다.');
+      setAssignments([]);
+      setTotalItems(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [cohortId, page, status, workbookId]);
+
+  const loadOptions = useCallback(async () => {
+    setIsOptionLoading(true);
+    setErrorMessage('');
+
+    try {
+      const [workbookResponse, cohortResponse] = await Promise.all([
+        workbookApi.list({
+          page: 1,
+          limit: OPTION_LIMIT,
+          status: 'published',
+        }),
+        cohortApi.list({
+          page: 1,
+          limit: OPTION_LIMIT,
+        }),
+      ]);
+      const publishedWorkbooks = workbookResponse.data.filter((workbook) => workbook.status === 'published');
+
+      setWorkbooks(publishedWorkbooks);
+      setCohorts(cohortResponse.data);
+      setFormValues((current) => ({
+        ...current,
+        workbookId: current.workbookId || publishedWorkbooks[0]?.id || '',
+        workbookTitle:
+          current.workbookTitle ||
+          publishedWorkbooks.find((workbook) => workbook.id === current.workbookId)?.title ||
+          publishedWorkbooks[0]?.title ||
+          '',
+        cohortId: current.cohortId || cohortResponse.data[0]?.id || '',
+      }));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '문제집 또는 기수 목록을 불러오지 못했습니다.');
+    } finally {
+      setIsOptionLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadAssignments();
+  }, [loadAssignments]);
+
+  useEffect(() => {
+    void loadOptions();
+  }, [loadOptions]);
+
+  const openCreateForm = () => {
+    setEditingAssignmentId(null);
+    setFormValues({
+      ...defaultFormValues,
+      workbookId: workbooks[0]?.id ?? '',
+      workbookTitle: workbooks[0]?.title ?? '',
+      cohortId: cohorts[0]?.id ?? '',
     });
-    setSelectedCohortIds([]);
+    setFormMode('create');
   };
 
-  const cancelAssignment = (assignmentId: string) => {
-    const now = new Date().toISOString();
+  const openEditForm = async (assignment: WorkbookAssignmentTableRow) => {
+    setIsSubmitting(true);
+    setErrorMessage('');
 
-    setAssignments((current) =>
-      current.map((assignment) =>
-        assignment.id === assignmentId
-          ? {
-              ...assignment,
-              status: 'closed',
-              updatedAt: now,
-            }
-          : assignment,
-      ),
-    );
+    try {
+      const response = await workbookAssignmentApi.get(assignment.id);
+      setEditingAssignmentId(assignment.id);
+      setFormValues({
+        workbookId: response.data.workbook.id,
+        workbookTitle: response.data.workbook.title,
+        cohortId: response.data.cohort.id,
+        opensOn: toDateInputValue(response.data.opensAt),
+        closesOn: toDateInputValue(response.data.closesAt),
+        maxAttempts: response.data.maxAttempts,
+      });
+      setFormMode('edit');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '배포 상세를 불러오지 못했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const closeForm = () => {
+    setEditingAssignmentId(null);
+    setFormMode(null);
+  };
+
+  const handleWorkbookFilterChange = (value: string) => {
+    setWorkbookId(value);
+    setPage(1);
+  };
+
+  const handleCohortFilterChange = (value: string) => {
+    setCohortId(value);
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (value: AssignmentStatus | 'all') => {
+    setStatus(value);
+    setPage(1);
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!formValues.workbookId || !formValues.cohortId || !formValues.opensOn || !formValues.closesOn) return;
+
+    setIsSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      const payload = {
+        status: getApiStatus(formValues.opensOn, formValues.closesOn),
+        opensAt: toStartIso(formValues.opensOn),
+        closesAt: toEndIso(formValues.closesOn),
+        maxAttempts: Math.max(1, formValues.maxAttempts),
+      };
+
+      if (formMode === 'create') {
+        await workbookAssignmentApi.create(formValues.workbookId, {
+          ...payload,
+          cohortId: formValues.cohortId,
+        });
+        closeForm();
+        setPage(1);
+        await loadAssignments(1);
+        return;
+      }
+
+      if (!editingAssignmentId) return;
+
+      await workbookAssignmentApi.update(editingAssignmentId, payload);
+      closeForm();
+      await loadAssignments();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '배포 정보를 저장하지 못했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (assignmentId: string) => {
+    const confirmed = window.confirm('선택한 배포를 삭제할까요?');
+    if (!confirmed) return;
+
+    setIsSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      await workbookAssignmentApi.delete(assignmentId);
+      setPage(1);
+      await loadAssignments(1);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '배포를 삭제하지 못했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -219,41 +278,141 @@ export function WorkbookAssignmentPage() {
         </div>
         <button
           className="primary-button"
-          disabled={!selectedWorkbookId || selectedCohortIds.length === 0}
+          disabled={isSubmitting || !hasAssignableWorkbooks || cohorts.length === 0}
           type="button"
-          onClick={distributeWorkbook}
+          onClick={openCreateForm}
         >
-          {selectedCohortIds.length.toLocaleString('ko-KR')}개 기수에 배포
+          배포 추가
         </button>
       </section>
+
+      {errorMessage ? <p className="table-subtitle">{errorMessage}</p> : null}
+      {!hasAssignableWorkbooks ? (
+        <p className="table-subtitle">배포 가능한 문제집이 없습니다. 문제집을 사용중 상태로 변경해주세요.</p>
+      ) : null}
+
+      {formMode ? (
+        <section className="dashboard-panel">
+          <div className="panel-header">
+            <div>
+              <h2>{formMode === 'create' ? '배포 생성' : '배포 수정'}</h2>
+              <p>문제집, 기수, 기간, 최대 응시 횟수를 설정합니다.</p>
+            </div>
+            {selectedWorkbook ? (
+              <div className="workbook-summary">
+                <strong>{selectedWorkbook.questionCount ?? 0}문항</strong>
+                <span className={`status-pill status-${selectedWorkbook.status}`}>
+                  {WorkbookStatusLabel[selectedWorkbook.status]}
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          <form className="cohort-form" onSubmit={handleSubmit}>
+            <div className="form-grid">
+              <label>
+                <span>문제집</span>
+                {formMode === 'edit' ? (
+                  <input disabled value={formValues.workbookTitle || '문제집 정보 없음'} />
+                ) : (
+                  <select
+                    disabled={isSubmitting || !hasAssignableWorkbooks}
+                    value={formValues.workbookId}
+                    onChange={(event) => {
+                      const workbook = workbooks.find((item) => item.id === event.target.value);
+                      setFormValues((current) => ({
+                        ...current,
+                        workbookId: event.target.value,
+                        workbookTitle: workbook?.title ?? '',
+                      }));
+                    }}
+                  >
+                    {workbooks.map((workbook) => (
+                      <option key={workbook.id} value={workbook.id}>
+                        {workbook.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </label>
+
+              <label>
+                <span>기수</span>
+                <select
+                  disabled={isSubmitting || formMode === 'edit'}
+                  value={formValues.cohortId}
+                  onChange={(event) => setFormValues((current) => ({ ...current, cohortId: event.target.value }))}
+                >
+                  {cohorts.map((cohort) => (
+                    <option key={cohort.id} value={cohort.id}>
+                      {cohort.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>시작일</span>
+                <input
+                  disabled={isSubmitting}
+                  required
+                  type="date"
+                  value={formValues.opensOn}
+                  onChange={(event) => setFormValues((current) => ({ ...current, opensOn: event.target.value }))}
+                />
+              </label>
+
+              <label>
+                <span>종료일</span>
+                <input
+                  disabled={isSubmitting}
+                  required
+                  type="date"
+                  value={formValues.closesOn}
+                  onChange={(event) => setFormValues((current) => ({ ...current, closesOn: event.target.value }))}
+                />
+              </label>
+
+              <label>
+                <span>최대 응시 횟수</span>
+                <input
+                  disabled={isSubmitting}
+                  min={1}
+                  required
+                  type="number"
+                  value={formValues.maxAttempts}
+                  onChange={(event) =>
+                    setFormValues((current) => ({ ...current, maxAttempts: Number(event.target.value) }))
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="form-actions">
+              <button className="secondary-button" disabled={isSubmitting} type="button" onClick={closeForm}>
+                취소
+              </button>
+              <button className="primary-button" disabled={isSubmitting} type="submit">
+                {isSubmitting ? '저장 중...' : formMode === 'create' ? '배포 생성' : '수정 저장'}
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
 
       <section className="dashboard-panel">
         <div className="panel-header">
           <div>
-            <h2>배포 설정</h2>
-            <p>문제집과 배포 대상 기수를 선택하고 마감일을 지정합니다.</p>
+            <h2>배포 목록</h2>
+            <p>문제집과 기수 기준으로 배포 현황을 확인합니다.</p>
           </div>
-          {selectedWorkbook ? (
-            <div className="workbook-summary">
-              <strong>{selectedWorkbook.questionCount ?? 0}문항</strong>
-              <span>{selectedWorkbook.totalPoints ?? 0}점</span>
-              <span className={`status-pill status-${selectedWorkbook.status}`}>
-                {workbookStatusLabels[selectedWorkbook.status]}
-              </span>
-            </div>
-          ) : null}
         </div>
 
         <div className="toolbar">
           <label className="search-field">
             <span>문제집</span>
-            <select
-              value={selectedWorkbookId}
-              onChange={(event) => {
-                setSelectedWorkbookId(event.target.value);
-                setSelectedCohortIds([]);
-              }}
-            >
+            <select value={workbookId} onChange={(event) => handleWorkbookFilterChange(event.target.value)}>
+              <option value="all">전체 문제집</option>
               {workbooks.map((workbook) => (
                 <option key={workbook.id} value={workbook.id}>
                   {workbook.title}
@@ -263,84 +422,40 @@ export function WorkbookAssignmentPage() {
           </label>
 
           <label className="search-field">
-            <span>배포 마감일</span>
-            <input value={dueDate} type="date" onChange={(event) => setDueDate(event.target.value)} />
+            <span>기수</span>
+            <select value={cohortId} onChange={(event) => handleCohortFilterChange(event.target.value)}>
+              <option value="all">전체 기수</option>
+              {cohorts.map((cohort) => (
+                <option key={cohort.id} value={cohort.id}>
+                  {cohort.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="search-field">
+            <span>상태</span>
+            <select
+              value={status}
+              onChange={(event) => handleStatusFilterChange(event.target.value as AssignmentStatus | 'all')}
+            >
+              <option value="all">전체 상태</option>
+              <option value="scheduled">예정</option>
+              <option value="open">진행중</option>
+              <option value="closed">종료</option>
+            </select>
           </label>
         </div>
 
-        {selectedWorkbook ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>선택</th>
-                  <th>기수</th>
-                  <th>학생수</th>
-                  <th>기수 상태</th>
-                  <th>배포 상태</th>
-                  <th>마감일</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cohorts.map((cohort) => {
-                  const assignment = assignmentByCohort.get(cohort.id);
-                  const isActiveAssigned = assignment?.status === 'active';
-                  const isSelected = selectedCohortIds.includes(cohort.id);
+        {isLoading || isOptionLoading ? <p className="table-subtitle">배포 데이터를 불러오는 중입니다.</p> : null}
 
-                  return (
-                    <tr key={cohort.id}>
-                      <td>
-                        <input
-                          checked={isSelected || isActiveAssigned}
-                          disabled={isActiveAssigned}
-                          type="checkbox"
-                          onChange={() => toggleCohort(cohort.id)}
-                        />
-                      </td>
-                      <td>
-                        <div className="table-title">{cohort.name}</div>
-                        <span className="table-subtitle">
-                          {cohort.code} · {cohort.description ?? '설명 없음'}
-                        </span>
-                      </td>
-                      <td>{cohort.studentCount.toLocaleString('ko-KR')}명</td>
-                      <td>
-                        <span className={`status-pill status-${cohort.status}`}>
-                          {cohortStatusLabels[cohort.status]}
-                        </span>
-                      </td>
-                      <td>
-                        {assignment ? (
-                          <span className={`status-pill status-${assignment.status}`}>
-                            {assignmentStatusLabels[assignment.status]}
-                          </span>
-                        ) : (
-                          <span className="table-subtitle">미배포</span>
-                        )}
-                      </td>
-                      <td>{formatDate(assignment?.dueDate)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty-drop">
-            <strong>배포할 문제집이 없습니다.</strong>
-            <p>문제집 관리에서 문제집을 먼저 생성하세요.</p>
-          </div>
-        )}
-      </section>
-
-      <section className="dashboard-panel">
-        <div className="panel-header">
-          <div>
-            <h2>배포 이력</h2>
-            <p>활성 배포는 취소할 수 있으며, 취소된 배포는 종료 상태로 남습니다.</p>
-          </div>
-        </div>
-        <WorkbookAssignmentTable assignments={assignmentTableRows} onCancel={cancelAssignment} />
+        <WorkbookAssignmentTable
+          assignments={assignmentTableRows}
+          disabled={isSubmitting}
+          onDelete={handleDelete}
+          onEdit={openEditForm}
+        />
+        <Pagination currentPage={currentPage} totalItems={totalItems} totalPages={totalPages} onPageChange={setPage} />
       </section>
     </div>
   );

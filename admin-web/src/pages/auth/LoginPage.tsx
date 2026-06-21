@@ -5,6 +5,8 @@ import { findAdminId, findAdminPassword, isAdminAuthenticated, loginAdmin } from
 
 type FindMode = 'id' | 'password';
 
+const AUTH_EXPIRED_MESSAGE_STORAGE_KEY = 'sejong_admin_auth_expired_message';
+
 const loginPageStyle: CSSProperties = {
   alignItems: 'center',
   background: '#f3f4f6',
@@ -50,6 +52,12 @@ const resultTextStyle: CSSProperties = {
   margin: '10px 0 0',
 };
 
+const getInitialLoginMessage = () => {
+  const message = sessionStorage.getItem(AUTH_EXPIRED_MESSAGE_STORAGE_KEY) ?? '';
+  sessionStorage.removeItem(AUTH_EXPIRED_MESSAGE_STORAGE_KEY);
+  return message;
+};
+
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,7 +65,7 @@ export function LoginPage() {
   const redirectTo = redirectState?.from ?? '/admin/dashboard';
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
+  const [loginError, setLoginError] = useState(getInitialLoginMessage);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [findMode, setFindMode] = useState<FindMode | null>(null);
   const [securityAnswer, setSecurityAnswer] = useState('');

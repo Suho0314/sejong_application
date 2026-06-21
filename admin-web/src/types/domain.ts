@@ -5,7 +5,7 @@ export type StudentStatus = 'active' | 'inactive' | 'paused' | 'graduated';
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type QuestionType = 'multiple_choice';
 export type ContentStatus = 'draft' | 'published' | 'archived';
-export type AssignmentStatus = 'active' | 'closed';
+export type AssignmentStatus = 'scheduled' | 'open' | 'closed';
 export type SubmissionStatus = 'in_progress' | 'submitted';
 
 export type User = {
