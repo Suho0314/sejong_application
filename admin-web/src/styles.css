@@ -226,6 +226,21 @@ th {
   color: #1d4ed8;
 }
 
+.status-paused {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-inactive {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.status-graduated {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .status-cancelled {
   background: #fee2e2;
   color: #991b1b;

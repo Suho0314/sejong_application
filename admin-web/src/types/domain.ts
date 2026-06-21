@@ -1,7 +1,7 @@
 export type Role = 'admin' | 'teacher' | 'student';
 export type UserStatus = 'active' | 'inactive';
 export type CohortStatus = 'planned' | 'active' | 'completed';
-export type StudentStatus = 'active' | 'inactive' | 'graduated';
+export type StudentStatus = 'active' | 'inactive' | 'paused' | 'graduated';
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type QuestionType = 'multiple_choice';
 export type ContentStatus = 'draft' | 'published' | 'archived';

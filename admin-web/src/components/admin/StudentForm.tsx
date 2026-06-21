@@ -19,6 +19,7 @@ export type StudentFormValues = {
 
 type StudentFormProps = {
   cohorts: StudentFormCohort[];
+  disabled?: boolean;
   initialValues?: StudentFormValues;
   mode: 'create' | 'edit';
   onCancel: () => void;
@@ -36,7 +37,7 @@ const emptyValues: StudentFormValues = {
   enrolledOn: '',
 };
 
-export function StudentForm({ cohorts, initialValues, mode, onCancel, onSubmit }: StudentFormProps) {
+export function StudentForm({ cohorts, disabled = false, initialValues, mode, onCancel, onSubmit }: StudentFormProps) {
   const [values, setValues] = useState<StudentFormValues>(initialValues ?? emptyValues);
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export function StudentForm({ cohorts, initialValues, mode, onCancel, onSubmit }
           <span>이름</span>
           <input
             required
+            disabled={disabled}
             value={values.name}
             onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
             placeholder="학생 이름"
@@ -64,6 +66,7 @@ export function StudentForm({ cohorts, initialValues, mode, onCancel, onSubmit }
           <span>이메일</span>
           <input
             required
+            disabled={disabled}
             type="email"
             value={values.email}
             onChange={(event) => setValues((current) => ({ ...current, email: event.target.value }))}
@@ -73,6 +76,7 @@ export function StudentForm({ cohorts, initialValues, mode, onCancel, onSubmit }
         <label>
           <span>연락처</span>
           <input
+            disabled={disabled}
             value={values.phone}
             onChange={(event) => setValues((current) => ({ ...current, phone: event.target.value }))}
             placeholder="010-0000-0000"
@@ -82,6 +86,7 @@ export function StudentForm({ cohorts, initialValues, mode, onCancel, onSubmit }
           <span>학생 번호</span>
           <input
             required
+            disabled={disabled}
             value={values.studentNo}
             onChange={(event) => setValues((current) => ({ ...current, studentNo: event.target.value }))}
             placeholder="S-2026-001"
@@ -91,6 +96,7 @@ export function StudentForm({ cohorts, initialValues, mode, onCancel, onSubmit }
           <span>소속 기수</span>
           <select
             required
+            disabled={disabled}
             value={values.cohortId}
             onChange={(event) => setValues((current) => ({ ...current, cohortId: event.target.value }))}
           >
@@ -105,18 +111,21 @@ export function StudentForm({ cohorts, initialValues, mode, onCancel, onSubmit }
           <span>상태</span>
           <select
             value={values.status}
+            disabled={disabled}
             onChange={(event) =>
               setValues((current) => ({ ...current, status: event.target.value as StudentStatus }))
             }
           >
             <option value="active">재원</option>
-            <option value="inactive">비활성</option>
+            <option value="paused">휴원</option>
+            <option value="inactive">휴면</option>
             <option value="graduated">수료</option>
           </select>
         </label>
         <label>
           <span>생년월일</span>
           <input
+            disabled={disabled}
             type="date"
             value={values.birthDate}
             onChange={(event) => setValues((current) => ({ ...current, birthDate: event.target.value }))}
@@ -126,6 +135,7 @@ export function StudentForm({ cohorts, initialValues, mode, onCancel, onSubmit }
           <span>등록일</span>
           <input
             required
+            disabled={disabled}
             type="date"
             value={values.enrolledOn}
             onChange={(event) => setValues((current) => ({ ...current, enrolledOn: event.target.value }))}
@@ -133,11 +143,11 @@ export function StudentForm({ cohorts, initialValues, mode, onCancel, onSubmit }
         </label>
       </div>
       <div className="form-actions">
-        <button className="secondary-button" type="button" onClick={onCancel}>
+        <button className="secondary-button" disabled={disabled} type="button" onClick={onCancel}>
           취소
         </button>
-        <button className="primary-button" type="submit">
-          {mode === 'create' ? '추가' : '저장'}
+        <button className="primary-button" disabled={disabled} type="submit">
+          {disabled ? '저장 중...' : mode === 'create' ? '추가' : '저장'}
         </button>
       </div>
     </form>

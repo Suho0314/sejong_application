@@ -31,7 +31,8 @@ type StudentTableProps = {
 
 const statusLabels: Record<StudentStatus, string> = {
   active: '재원',
-  inactive: '비활성',
+  paused: '휴원',
+  inactive: '휴면',
   graduated: '수료',
 };
 
@@ -73,7 +74,7 @@ export function StudentTable({ cohorts, students, onDelete, onEdit }: StudentTab
               <td>
                 <span className={`status-pill status-${student.status}`}>{statusLabels[student.status]}</span>
               </td>
-              <td>{formatDate(student.enrolledAt)}</td>
+              <td>{formatDate(student.enrolledOn)}</td>
               <td>
                 <button className="text-button" type="button" onClick={() => onEdit(student)}>
                   수정
