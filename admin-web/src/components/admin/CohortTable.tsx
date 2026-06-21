@@ -27,23 +27,25 @@ const statusLabels: Record<CohortStatus, string> = {
   completed: '완료',
 };
 
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(value));
+const formatDate = (value: string | null) => {
+  if (!value) return '-';
+
+  return value.replace(/-/g, '.');
+};
+
+const formatPeriod = (startsOn: string, endsOn: string | null) =>
+  `${formatDate(startsOn)} ~ ${formatDate(endsOn)}`;
 
 export function CohortTable({ cohorts, onDelete, onEdit }: CohortTableProps) {
   return (
     <div className="table-wrap">
-      <table>
+      <table className="cohort-table">
         <thead>
           <tr>
             <th>기수명</th>
-            <th>학생수</th>
+            <th className="cohort-period-cell">기간</th>
+            <th className="cohort-student-count">학생수</th>
             <th>상태</th>
-            <th>생성일</th>
             <th>수정</th>
             <th>삭제</th>
           </tr>
@@ -57,11 +59,11 @@ export function CohortTable({ cohorts, onDelete, onEdit }: CohortTableProps) {
                   {cohort.code} · {cohort.description}
                 </span>
               </td>
-              <td>{cohort.studentCount.toLocaleString('ko-KR')}명</td>
+              <td className="cohort-period-cell">{formatPeriod(cohort.startsOn, cohort.endsOn)}</td>
+              <td className="cohort-student-count">{cohort.studentCount.toLocaleString('ko-KR')}명</td>
               <td>
                 <span className={`status-pill status-${cohort.status}`}>{statusLabels[cohort.status]}</span>
               </td>
-              <td>{formatDate(cohort.createdAt)}</td>
               <td>
                 <button className="text-button" type="button" onClick={() => onEdit(cohort)}>
                   수정
