@@ -16,11 +16,13 @@ export type ScoreSubmissionRow = {
 
 type ScoreSubmissionTableProps = {
   submissions: ScoreSubmissionRow[];
+  onViewDetail: (submissionId: string) => void;
 };
 
 const statusLabels: Record<SubmissionStatus, string> = {
   in_progress: '진행중',
   submitted: '제출완료',
+  graded: '채점완료',
 };
 
 const formatDate = (value?: string | null) => {
@@ -35,7 +37,7 @@ const formatDate = (value?: string | null) => {
   }).format(new Date(value));
 };
 
-export function ScoreSubmissionTable({ submissions }: ScoreSubmissionTableProps) {
+export function ScoreSubmissionTable({ submissions, onViewDetail }: ScoreSubmissionTableProps) {
   return (
     <div className="table-wrap">
       <table>
@@ -48,6 +50,7 @@ export function ScoreSubmissionTable({ submissions }: ScoreSubmissionTableProps)
             <th>정답/오답</th>
             <th>상태</th>
             <th>제출일</th>
+            <th>상세</th>
           </tr>
         </thead>
         <tbody>
@@ -71,11 +74,16 @@ export function ScoreSubmissionTable({ submissions }: ScoreSubmissionTableProps)
                 <span className={`status-pill status-${submission.status}`}>{statusLabels[submission.status]}</span>
               </td>
               <td>{formatDate(submission.submittedAt)}</td>
+              <td>
+                <button className="text-button" type="button" onClick={() => onViewDetail(submission.id)}>
+                  상세
+                </button>
+              </td>
             </tr>
           ))}
           {submissions.length === 0 ? (
             <tr>
-              <td className="empty-cell" colSpan={7}>
+              <td className="empty-cell" colSpan={8}>
                 조건에 맞는 성적이 없습니다.
               </td>
             </tr>

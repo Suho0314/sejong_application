@@ -1,90 +1,59 @@
-import { useMemo, useState } from 'react';
-import {
-  QuestionAccuracyRow,
-  QuestionAccuracyTable,
-} from '../../../components/admin/QuestionAccuracyTable';
+import { CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
+import { cohortApi, CohortApiItem } from '../../../api/cohorts';
+import { scoreApi, ScoreApiItem } from '../../../api/scores';
+import { studentApi, StudentApiItem } from '../../../api/students';
+import { submissionApi, SubmissionDetailApiItem } from '../../../api/submissions';
+import { workbookAssignmentApi, WorkbookAssignmentApiItem } from '../../../api/workbookAssignments';
+import { workbookApi, WorkbookApiItem } from '../../../api/workbooks';
+import { Pagination } from '../../../components/admin/Pagination';
 import { ScoreSubmissionRow, ScoreSubmissionTable } from '../../../components/admin/ScoreSubmissionTable';
-import cohortsData from '../../../mock/cohorts.json';
-import questionsData from '../../../mock/questions.json';
-import submissionAnswersData from '../../../mock/submissionAnswers.json';
-import submissionsData from '../../../mock/submissions.json';
-import studentsData from '../../../mock/students.json';
-import workbooksData from '../../../mock/workbooks.json';
-import { CohortStatus, ContentStatus, Difficulty, StudentStatus, SubmissionStatus } from '../../../types/domain';
 
-type StudentRow = {
-  id: string;
-  cohortId: string;
-  name?: string;
-  studentNo?: string;
-  status: StudentStatus;
+const PAGE_SIZE = 10;
+const OPTION_LIMIT = 100;
+
+const modalBackdropStyle: CSSProperties = {
+  alignItems: 'center',
+  background: 'rgba(15, 23, 42, 0.36)',
+  display: 'flex',
+  inset: 0,
+  justifyContent: 'center',
+  padding: 24,
+  position: 'fixed',
+  zIndex: 20,
 };
 
-type CohortRow = {
-  id: string;
-  name: string;
-  code: string;
-  status: CohortStatus;
+const modalPanelStyle: CSSProperties = {
+  maxHeight: 'calc(100vh - 48px)',
+  maxWidth: 920,
+  overflowY: 'auto',
+  width: 'min(920px, 100%)',
 };
 
-type WorkbookRow = {
-  id: string;
-  title: string;
-  status: ContentStatus;
+const formatDate = (value?: string | null) => {
+  if (!value) return '-';
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
 };
 
-type SubmissionRow = {
-  id: string;
-  studentId: string;
-  workbookId: string;
-  submittedAt?: string | null;
-  score: number;
-  totalScore: number;
-  correctCount: number;
-  wrongCount: number;
-  status: SubmissionStatus;
-};
-
-type SubmissionAnswerRow = {
-  id: string;
-  submissionId: string;
-  questionId: string;
-  selectedAnswerIndex?: number | null;
-  isCorrect: boolean;
-  score: number;
-};
-
-type QuestionRow = {
-  id: string;
-  subject: string;
-  category?: string;
-  difficulty: Difficulty;
-  content: string;
-  stem?: string;
-};
-
-const students = studentsData as StudentRow[];
-const cohorts = cohortsData.map((cohort) => ({
-  id: cohort.id,
-  name: cohort.name,
-  code: cohort.code,
-  status: cohort.status as CohortStatus,
-})) satisfies CohortRow[];
-const workbooks = workbooksData.map((workbook) => ({
-  id: workbook.id,
-  title: workbook.title,
-  status: workbook.status as ContentStatus,
-})) satisfies WorkbookRow[];
-const submissions = submissionsData as SubmissionRow[];
-const submissionAnswers = submissionAnswersData as SubmissionAnswerRow[];
-const questions = questionsData as QuestionRow[];
-
-const getQuestionText = (question: QuestionRow) => question.content || question.stem || '';
-
-const toPercent = (score: number, totalScore: number) => {
-  if (totalScore <= 0) return 0;
-  return Math.round((score / totalScore) * 100);
-};
+const toRow = (score: ScoreApiItem): ScoreSubmissionRow => ({
+  id: score.submissionId,
+  studentName: score.student.name,
+  studentNo: score.student.studentNo ?? undefined,
+  cohortName: score.cohort.name,
+  workbookTitle: score.workbook.title,
+  score: score.earnedPoints,
+  totalScore: score.totalPoints,
+  correctCount: score.correctCount,
+  wrongCount: score.wrongCount,
+  status: score.status,
+  submittedAt: score.submittedAt,
+});
 
 const average = (values: number[]) => {
   if (values.length === 0) return 0;
@@ -92,151 +61,173 @@ const average = (values: number[]) => {
 };
 
 export function ScorePage() {
-  const [cohortFilter, setCohortFilter] = useState('all');
-  const [workbookFilter, setWorkbookFilter] = useState('all');
+  const [scores, setScores] = useState<ScoreApiItem[]>([]);
+  const [cohorts, setCohorts] = useState<CohortApiItem[]>([]);
+  const [students, setStudents] = useState<StudentApiItem[]>([]);
+  const [workbooks, setWorkbooks] = useState<WorkbookApiItem[]>([]);
+  const [assignments, setAssignments] = useState<WorkbookAssignmentApiItem[]>([]);
+  const [cohortId, setCohortId] = useState('all');
+  const [studentId, setStudentId] = useState('all');
+  const [workbookId, setWorkbookId] = useState('all');
+  const [assignmentId, setAssignmentId] = useState('all');
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [selectedSubmission, setSelectedSubmission] = useState<SubmissionDetailApiItem | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOptionLoading, setIsOptionLoading] = useState(false);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const filteredSubmissions = useMemo(() => {
-    return submissions.filter((submission) => {
-      const student = students.find((item) => item.id === submission.studentId);
-      const matchesCohort = cohortFilter === 'all' || student?.cohortId === cohortFilter;
-      const matchesWorkbook = workbookFilter === 'all' || submission.workbookId === workbookFilter;
-
-      return matchesCohort && matchesWorkbook;
-    });
-  }, [cohortFilter, workbookFilter]);
-
-  const submittedSubmissions = useMemo(
-    () => filteredSubmissions.filter((submission) => submission.status === 'submitted'),
-    [filteredSubmissions],
-  );
-
-  const scoreRows = useMemo<ScoreSubmissionRow[]>(
-    () =>
-      filteredSubmissions
-        .map((submission) => {
-          const student = students.find((item) => item.id === submission.studentId);
-          const cohort = cohorts.find((item) => item.id === student?.cohortId);
-          const workbook = workbooks.find((item) => item.id === submission.workbookId);
-
-          return {
-            id: submission.id,
-            studentName: student?.name ?? '-',
-            studentNo: student?.studentNo,
-            cohortName: cohort ? `${cohort.name} (${cohort.code})` : '-',
-            workbookTitle: workbook?.title ?? '-',
-            score: submission.score,
-            totalScore: submission.totalScore,
-            correctCount: submission.correctCount,
-            wrongCount: submission.wrongCount,
-            status: submission.status,
-            submittedAt: submission.submittedAt,
-          };
-        })
-        .sort((first, second) => {
-          const firstTime = first.submittedAt ? new Date(first.submittedAt).getTime() : 0;
-          const secondTime = second.submittedAt ? new Date(second.submittedAt).getTime() : 0;
-          return secondTime - firstTime;
-        }),
-    [filteredSubmissions],
-  );
-
-  const questionAnalysis = useMemo<QuestionAccuracyRow[]>(() => {
-    const submissionIds = new Set(submittedSubmissions.map((submission) => submission.id));
-    const answerGroups = new Map<string, SubmissionAnswerRow[]>();
-
-    submissionAnswers
-      .filter((answer) => submissionIds.has(answer.submissionId))
-      .forEach((answer) => {
-        const current = answerGroups.get(answer.questionId) ?? [];
-        answerGroups.set(answer.questionId, [...current, answer]);
-      });
-
-    return Array.from(answerGroups.entries())
-      .map(([questionId, answers]) => {
-        const question = questions.find((item) => item.id === questionId);
-        const correctCount = answers.filter((answer) => answer.isCorrect).length;
-        const wrongCount = answers.length - correctCount;
-        const accuracyRate = answers.length > 0 ? (correctCount / answers.length) * 100 : 0;
-
-        return {
-          questionId,
-          content: question ? getQuestionText(question) : '-',
-          subject: question?.subject ?? '-',
-          category: question?.category,
-          answerCount: answers.length,
-          correctCount,
-          wrongCount,
-          accuracyRate,
-          wrongRate: 100 - accuracyRate,
-        };
-      })
-      .sort((first, second) => first.accuracyRate - second.accuracyRate);
-  }, [submittedSubmissions]);
-
-  const wrongRateQuestions = questionAnalysis
-    .filter((question) => question.answerCount > 0)
-    .sort((first, second) => second.wrongRate - first.wrongRate)
-    .slice(0, 5);
-
-  const averageScore = average(submittedSubmissions.map((submission) => toPercent(submission.score, submission.totalScore)));
-  const totalAnswers = questionAnalysis.reduce((sum, question) => sum + question.answerCount, 0);
-  const averageAccuracy = average(questionAnalysis.map((question) => question.accuracyRate));
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const rows = useMemo(() => scores.map(toRow), [scores]);
+  const submittedScores = scores.filter((score) => score.submittedAt);
+  const averageScore = average(submittedScores.map((score) => score.score));
+  const averageCorrectRate = average(submittedScores.map((score) => score.correctRate));
 
   const statCards = [
     {
-      label: '제출 건수',
-      value: `${submittedSubmissions.length.toLocaleString('ko-KR')}건`,
-      note: `전체 ${filteredSubmissions.length.toLocaleString('ko-KR')}건`,
+      label: '성적 건수',
+      value: `${totalItems.toLocaleString('ko-KR')}건`,
+      note: '현재 필터 기준',
     },
     {
       label: '평균 점수',
       value: `${averageScore}점`,
-      note: '제출 완료 기준',
+      note: '현재 페이지 기준',
     },
     {
-      label: '문항 평균 정답률',
-      value: `${averageAccuracy}%`,
-      note: `${totalAnswers.toLocaleString('ko-KR')}개 답안 분석`,
+      label: '평균 정답률',
+      value: `${averageCorrectRate}%`,
+      note: '현재 페이지 기준',
     },
     {
-      label: '오답 집중 문항',
-      value: `${wrongRateQuestions.length.toLocaleString('ko-KR')}개`,
-      note: '오답률 높은 순',
+      label: '상세 조회',
+      value: selectedSubmission ? '열림' : '대기',
+      note: '제출 답안 확인',
     },
   ];
+
+  const loadScores = useCallback(async (nextPage = page) => {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const response = await scoreApi.list({
+        page: nextPage,
+        limit: PAGE_SIZE,
+        cohortId: cohortId === 'all' ? undefined : cohortId,
+        studentId: studentId === 'all' ? undefined : studentId,
+        workbookId: workbookId === 'all' ? undefined : workbookId,
+        assignmentId: assignmentId === 'all' ? undefined : assignmentId,
+      });
+
+      setScores(response.data);
+      setTotalItems(response.meta.total);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '성적 목록을 불러오지 못했습니다.');
+      setScores([]);
+      setTotalItems(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [assignmentId, cohortId, page, studentId, workbookId]);
+
+  const loadOptions = useCallback(async () => {
+    setIsOptionLoading(true);
+    setErrorMessage('');
+
+    try {
+      const [cohortResponse, studentResponse, workbookResponse, assignmentResponse] = await Promise.all([
+        cohortApi.list({ page: 1, limit: OPTION_LIMIT }),
+        studentApi.list({ page: 1, limit: OPTION_LIMIT }),
+        workbookApi.list({ page: 1, limit: OPTION_LIMIT }),
+        workbookAssignmentApi.list({ page: 1, limit: OPTION_LIMIT }),
+      ]);
+
+      setCohorts(cohortResponse.data);
+      setStudents(studentResponse.data);
+      setWorkbooks(workbookResponse.data);
+      setAssignments(assignmentResponse.data);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '필터 옵션을 불러오지 못했습니다.');
+    } finally {
+      setIsOptionLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadScores();
+  }, [loadScores]);
+
+  useEffect(() => {
+    void loadOptions();
+  }, [loadOptions]);
+
+  const resetPage = (callback: () => void) => {
+    callback();
+    setPage(1);
+  };
+
+  const viewSubmissionDetail = async (submissionId: string) => {
+    setIsDetailLoading(true);
+    setErrorMessage('');
+
+    try {
+      const response = await submissionApi.get(submissionId);
+      setSelectedSubmission(response.data);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '제출 상세를 불러오지 못했습니다.');
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
 
   return (
     <div className="dashboard-page">
       <section className="page-heading">
         <div>
-          <p className="eyebrow">Score Analysis</p>
-          <h1>성적분석</h1>
+          <p className="eyebrow">Score Management</p>
+          <h1>성적관리 / 제출조회</h1>
         </div>
-        <span className="today-label">Mock Data</span>
+        <span className="today-label">Backend API</span>
       </section>
+
+      {errorMessage ? <p className="table-subtitle">{errorMessage}</p> : null}
 
       <section className="dashboard-panel">
         <div className="panel-header">
           <div>
-            <h2>분석 필터</h2>
-            <p>기수와 문제집 기준으로 학생별 성적과 문항 정답률을 확인합니다.</p>
+            <h2>조회 필터</h2>
+            <p>기수, 학생, 문제집, 배포 기준으로 제출 성적을 조회합니다.</p>
           </div>
         </div>
         <div className="toolbar">
           <label className="search-field">
             <span>기수</span>
-            <select value={cohortFilter} onChange={(event) => setCohortFilter(event.target.value)}>
+            <select value={cohortId} onChange={(event) => resetPage(() => setCohortId(event.target.value))}>
               <option value="all">전체 기수</option>
               {cohorts.map((cohort) => (
                 <option key={cohort.id} value={cohort.id}>
-                  {cohort.name} ({cohort.code})
+                  {cohort.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="search-field">
+            <span>학생</span>
+            <select value={studentId} onChange={(event) => resetPage(() => setStudentId(event.target.value))}>
+              <option value="all">전체 학생</option>
+              {students.map((student) => (
+                <option key={student.id} value={student.id}>
+                  {student.name} {student.studentNo ? `(${student.studentNo})` : ''}
                 </option>
               ))}
             </select>
           </label>
           <label className="search-field">
             <span>문제집</span>
-            <select value={workbookFilter} onChange={(event) => setWorkbookFilter(event.target.value)}>
+            <select value={workbookId} onChange={(event) => resetPage(() => setWorkbookId(event.target.value))}>
               <option value="all">전체 문제집</option>
               {workbooks.map((workbook) => (
                 <option key={workbook.id} value={workbook.id}>
@@ -245,7 +236,19 @@ export function ScorePage() {
               ))}
             </select>
           </label>
+          <label className="search-field">
+            <span>배포</span>
+            <select value={assignmentId} onChange={(event) => resetPage(() => setAssignmentId(event.target.value))}>
+              <option value="all">전체 배포</option>
+              {assignments.map((assignment) => (
+                <option key={assignment.id} value={assignment.id}>
+                  {assignment.workbook.title} / {assignment.cohort.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+        {isOptionLoading ? <p className="table-subtitle">필터 옵션을 불러오는 중입니다.</p> : null}
       </section>
 
       <section className="stat-grid">
@@ -261,34 +264,96 @@ export function ScorePage() {
       <section className="dashboard-panel">
         <div className="panel-header">
           <div>
-            <h2>전체 성적 목록</h2>
-            <p>학생별 점수, 제출 상태, 정오답 수를 확인합니다.</p>
+            <h2>성적 목록</h2>
+            <p>학생명, 기수명, 문제집명, 점수, 제출일을 확인합니다.</p>
           </div>
         </div>
-        <ScoreSubmissionTable submissions={scoreRows} />
+        {isLoading ? <p className="table-subtitle">성적 목록을 불러오는 중입니다.</p> : null}
+        <ScoreSubmissionTable submissions={rows} onViewDetail={viewSubmissionDetail} />
+        <Pagination currentPage={currentPage} totalItems={totalItems} totalPages={totalPages} onPageChange={setPage} />
       </section>
 
-      <section className="dashboard-grid">
-        <div className="dashboard-panel">
-          <div className="panel-header">
-            <div>
-              <h2>문제별 정답률</h2>
-              <p>필터 조건에 포함된 제출 답안을 문항 단위로 집계합니다.</p>
-            </div>
-          </div>
-          <QuestionAccuracyTable questions={questionAnalysis} />
-        </div>
+      {isDetailLoading ? <p className="table-subtitle">제출 상세를 불러오는 중입니다.</p> : null}
 
-        <div className="dashboard-panel">
-          <div className="panel-header">
-            <div>
-              <h2>오답률 높은 문제</h2>
-              <p>보강 수업과 해설 개선이 필요한 문항입니다.</p>
+      {selectedSubmission ? (
+        <div aria-modal="true" role="dialog" style={modalBackdropStyle}>
+          <section className="dashboard-panel" style={modalPanelStyle}>
+            <div className="panel-header">
+              <div>
+                <h2>제출 상세</h2>
+                <p>
+                  {selectedSubmission.studentName} · {selectedSubmission.cohortName} ·{' '}
+                  {selectedSubmission.workbookTitle}
+                </p>
+              </div>
+              <button className="secondary-button" type="button" onClick={() => setSelectedSubmission(null)}>
+                닫기
+              </button>
             </div>
-          </div>
-          <QuestionAccuracyTable questions={wrongRateQuestions} variant="wrong" />
+
+            <div className="stat-grid">
+              <article className="stat-card">
+                <span>점수</span>
+                <strong>
+                  {selectedSubmission.earnedPoints}/{selectedSubmission.totalPoints}
+                </strong>
+                <p>{selectedSubmission.score}점</p>
+              </article>
+              <article className="stat-card">
+                <span>정답</span>
+                <strong>{selectedSubmission.correctCount}개</strong>
+                <p>오답 {selectedSubmission.wrongCount}개</p>
+              </article>
+              <article className="stat-card">
+                <span>제출일</span>
+                <strong>{formatDate(selectedSubmission.submittedAt)}</strong>
+                <p>응시 {selectedSubmission.attemptNo}회차</p>
+              </article>
+            </div>
+
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>문제</th>
+                    <th>선택 답안</th>
+                    <th>정답</th>
+                    <th>결과</th>
+                    <th>획득점수</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedSubmission.answers.map((answer) => (
+                    <tr key={answer.id}>
+                      <td>
+                        <div className="table-title">{answer.questionContent}</div>
+                        <span className="table-subtitle">
+                          {answer.sequence}번 · {answer.subject} · {answer.category ?? '미분류'}
+                        </span>
+                      </td>
+                      <td>{answer.selectedChoiceText ?? '미선택'}</td>
+                      <td>{answer.correctChoiceText ?? '-'}</td>
+                      <td>
+                        <span className={`status-pill ${answer.isCorrect ? 'status-open' : 'status-cancelled'}`}>
+                          {answer.isCorrect ? '정답' : '오답'}
+                        </span>
+                      </td>
+                      <td>{answer.earnedPoints.toLocaleString('ko-KR')}점</td>
+                    </tr>
+                  ))}
+                  {selectedSubmission.answers.length === 0 ? (
+                    <tr>
+                      <td className="empty-cell" colSpan={5}>
+                        답안 데이터가 없습니다.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
-      </section>
+      ) : null}
     </div>
   );
 }
