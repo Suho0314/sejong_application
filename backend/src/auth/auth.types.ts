@@ -1,4 +1,5 @@
-export type LoginRole = 'teacher' | 'student';
+export type UserRole = 'admin' | 'teacher' | 'student';
+export type LoginRole = Extract<UserRole, 'teacher' | 'student'>;
 
 export type LoginUserRow = {
   id: string;
@@ -13,6 +14,6 @@ export type LoginUserRow = {
 
 export type AccessTokenPayload = {
   sub: string;
-  role: LoginRole;
-  profileId: string;
+  role: UserRole;
+  profileId?: string;
 };
