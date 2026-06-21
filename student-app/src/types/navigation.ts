@@ -15,7 +15,7 @@ export type RootStackParamList = {
   WorkbookSolve: {
     workbookId: string;
   };
-  Result: { result?: SubmissionResult } | undefined;
+  Result: { result?: SubmissionResult; submissionId?: string } | undefined;
 };
 
 export type ScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<

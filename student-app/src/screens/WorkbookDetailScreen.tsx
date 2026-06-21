@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
-import { mockWorkbooks } from '../mock/studentMockData';
+import { useAuth } from '../state/AuthContext';
 import { useSolveProgress } from '../state/SolveProgressContext';
+import { useStudentData } from '../state/StudentDataContext';
 import type { ScreenProps } from '../types/navigation';
+import type { Workbook } from '../types/student';
 import {
   getWorkbookActionLabel,
   isActiveWorkbookStatus,
@@ -12,14 +15,33 @@ import {
 } from '../utils/workbookStatus';
 
 export function WorkbookDetailScreen({ navigation, route }: ScreenProps<'WorkbookDetail'>) {
-  const workbook = mockWorkbooks.find((item) => item.id === route.params.workbookId);
+  const { isAuthenticated } = useAuth();
+  const { errorMessage, getWorkbookDetail, isLoading, workbooks } = useStudentData();
+  const [workbook, setWorkbook] = useState<Workbook | null>(
+    () => workbooks.find((item) => item.id === route.params.workbookId) ?? null,
+  );
   const { getProgress } = useSolveProgress();
   const solveProgress = getProgress(route.params.workbookId);
+
+  useEffect(() => {
+    getWorkbookDetail(route.params.workbookId).then((detail) => {
+      if (detail) setWorkbook(detail);
+    });
+  }, [getWorkbookDetail, route.params.workbookId]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigation.replace('Login');
+    }
+  }, [isAuthenticated, navigation]);
 
   if (!workbook) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyTitle}>문제집을 찾을 수 없습니다.</Text>
+        <Text style={styles.emptyTitle}>
+          {isLoading ? '문제집을 불러오는 중입니다.' : '문제집을 찾을 수 없습니다.'}
+        </Text>
+        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
         <PrimaryButton onPress={() => navigation.goBack()}>목록으로 돌아가기</PrimaryButton>
       </View>
     );
@@ -222,6 +244,12 @@ const styles = StyleSheet.create({
     color: '#172554',
     fontSize: 20,
     fontWeight: '900',
+    textAlign: 'center',
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 13,
+    fontWeight: '800',
     textAlign: 'center',
   },
 });

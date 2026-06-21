@@ -1,11 +1,38 @@
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen } from '../components/Screen';
-import { mockStudent } from '../mock/studentMockData';
+import { useAuth } from '../state/AuthContext';
 import type { ScreenProps } from '../types/navigation';
 
 export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
+  const { expiredMessage, isAuthenticated, login, user } = useAuth();
+  const [id, setId] = useState('student1');
+  const [password, setPassword] = useState('student-1234');
+  const [errorMessage, setErrorMessage] = useState(expiredMessage);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.cohortId) {
+      navigation.replace('CohortSelect');
+    }
+  }, [isAuthenticated, navigation, user?.cohortId]);
+
+  const handleLogin = async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      await login(id, password);
+      navigation.replace('CohortSelect');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '로그인에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Screen>
       <View style={styles.container}>
@@ -24,12 +51,22 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
           <TextInput
             style={styles.input}
             placeholder="아이디"
-            defaultValue={mockStudent.loginId}
+            value={id}
+            onChangeText={setId}
             autoCapitalize="none"
           />
           <Text style={styles.label}>비밀번호</Text>
-          <TextInput style={styles.input} placeholder="비밀번호" defaultValue="1234" secureTextEntry />
-          <PrimaryButton onPress={() => navigation.replace('CohortSelect')}>로그인</PrimaryButton>
+          <TextInput
+            style={styles.input}
+            placeholder="비밀번호"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+          <PrimaryButton disabled={isLoading} onPress={handleLogin}>
+            {isLoading ? '로그인 중...' : '로그인'}
+          </PrimaryButton>
         </View>
       </View>
     </Screen>
@@ -93,5 +130,11 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     borderRadius: 16,
     backgroundColor: '#F8FAFC',
+  },
+  errorText: {
+    marginBottom: 8,
+    color: '#DC2626',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

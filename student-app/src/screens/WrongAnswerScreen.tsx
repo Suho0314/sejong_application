@@ -1,16 +1,17 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { WrongAnswerCard } from '../components/WrongAnswerCard';
 import { WrongAnswerSummaryCard } from '../components/WrongAnswerSummaryCard';
-import { useSubmissionHistory } from '../state/SubmissionHistoryContext';
+import type { SubmissionRecord } from '../types/student';
 import { buildWrongAnswerHistory } from '../utils/wrongAnswerHistory';
 
 type WrongAnswerScreenProps = {
   cohortId: string;
+  submissions: SubmissionRecord[];
+  onSubmissionPress: (submissionId: string) => void;
 };
 
-export function WrongAnswerScreen({ cohortId }: WrongAnswerScreenProps) {
-  const { submissions } = useSubmissionHistory();
+export function WrongAnswerScreen({ cohortId, submissions, onSubmissionPress }: WrongAnswerScreenProps) {
   const wrongAnswerHistory = buildWrongAnswerHistory(submissions, cohortId);
 
   return (
@@ -33,14 +34,18 @@ export function WrongAnswerScreen({ cohortId }: WrongAnswerScreenProps) {
       ) : (
         <View style={styles.historyList}>
           {wrongAnswerHistory.map((history) => (
-              <View key={history.workbookId} style={styles.historyGroup}>
+              <Pressable
+                key={history.submissionId}
+                style={styles.historyGroup}
+                onPress={() => onSubmissionPress(history.submissionId)}
+              >
                 <WrongAnswerSummaryCard history={history} />
                 <View style={styles.answerList}>
                   {history.wrongAnswers.map((answer, index) => (
                     <WrongAnswerCard key={answer.questionId} answer={answer} index={index} />
                   ))}
                 </View>
-              </View>
+              </Pressable>
           ))}
         </View>
       )}

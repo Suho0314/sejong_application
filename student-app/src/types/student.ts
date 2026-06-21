@@ -85,6 +85,7 @@ export type SubmissionRecord = {
 };
 
 export type WrongAnswerHistoryGroup = {
+  submissionId: string;
   workbookId: string;
   workbookTitle: string;
   latestSubmittedAt: string;

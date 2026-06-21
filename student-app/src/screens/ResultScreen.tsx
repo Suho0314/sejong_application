@@ -1,26 +1,44 @@
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ResultSummaryCard } from '../components/ResultSummaryCard';
 import { WrongAnswerCard } from '../components/WrongAnswerCard';
-import { mockStudent } from '../mock/studentMockData';
+import { useAuth } from '../state/AuthContext';
+import { useStudentData } from '../state/StudentDataContext';
 import type { ScreenProps } from '../types/navigation';
+import type { SubmissionResult } from '../types/student';
 
 export function ResultScreen({ navigation, route }: ScreenProps<'Result'>) {
-  const result = route.params?.result;
+  const { user } = useAuth();
+  const { errorMessage, getSubmissionResult, isLoading } = useStudentData();
+  const [loadedResult, setLoadedResult] = useState<SubmissionResult | null>(route.params?.result ?? null);
+  const submissionId = route.params?.submissionId;
+
+  useEffect(() => {
+    if (!loadedResult && submissionId) {
+      getSubmissionResult(submissionId).then((result) => {
+        if (result) setLoadedResult(result);
+      });
+    }
+  }, [getSubmissionResult, loadedResult, submissionId]);
+
+  const result = loadedResult;
 
   if (!result) {
     return (
       <View style={styles.emptyContainer}>
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>표시할 결과가 없습니다</Text>
+          <Text style={styles.emptyTitle}>
+            {isLoading ? '성적 상세를 불러오는 중입니다' : '표시할 결과가 없습니다'}
+          </Text>
           <Text style={styles.emptyDescription}>
-            문제집을 제출한 뒤 결과 화면에서 점수와 오답을 확인할 수 있습니다.
+            {errorMessage || '문제집을 제출한 뒤 결과 화면에서 점수와 오답을 확인할 수 있습니다.'}
           </Text>
           <PrimaryButton
             onPress={() =>
               navigation.navigate('Main', {
-                cohortId: mockStudent.cohortId,
+                cohortId: user?.cohortId ?? '',
                 initialTab: 'workbooks',
                 tabRequestKey: Date.now(),
               })
