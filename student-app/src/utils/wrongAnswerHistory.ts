@@ -27,6 +27,7 @@ export function buildWrongAnswerHistory(
 
     if (!group) {
       group = {
+        submissionId: submission.id,
         workbookId: result.workbookId,
         workbookTitle: result.workbookTitle,
         latestSubmittedAt: submission.submittedAt,

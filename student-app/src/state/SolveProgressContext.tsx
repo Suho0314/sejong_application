@@ -1,6 +1,5 @@
 import { createContext, type PropsWithChildren, useContext, useMemo, useState } from 'react';
 
-import { mockSolveProgress } from '../mock/studentMockData';
 import type { SolveProgress, SolveProgressStatus, StudentAnswer } from '../types/student';
 
 type ActiveSolveProgressStatus = Exclude<SolveProgressStatus, 'submitted'>;
@@ -20,7 +19,7 @@ type SolveProgressContextValue = {
 const SolveProgressContext = createContext<SolveProgressContextValue | null>(null);
 
 export function SolveProgressProvider({ children }: PropsWithChildren) {
-  const [progressList, setProgressList] = useState<SolveProgress[]>(mockSolveProgress);
+  const [progressList, setProgressList] = useState<SolveProgress[]>([]);
 
   const value = useMemo<SolveProgressContextValue>(() => ({
     progressList,

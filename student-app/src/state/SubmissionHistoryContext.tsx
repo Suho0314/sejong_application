@@ -1,6 +1,5 @@
 import { createContext, type PropsWithChildren, useContext, useMemo, useState } from 'react';
 
-import { mockSubmissionHistory } from '../mock/studentMockData';
 import type { SubmissionRecord, SubmissionResult } from '../types/student';
 
 type SubmissionHistoryContextValue = {
@@ -11,7 +10,7 @@ type SubmissionHistoryContextValue = {
 const SubmissionHistoryContext = createContext<SubmissionHistoryContextValue | null>(null);
 
 export function SubmissionHistoryProvider({ children }: PropsWithChildren) {
-  const [submissions, setSubmissions] = useState<SubmissionRecord[]>(mockSubmissionHistory);
+  const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
 
   const value = useMemo<SubmissionHistoryContextValue>(() => ({
     submissions,

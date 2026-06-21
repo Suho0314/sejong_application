@@ -3,18 +3,20 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { QuestionCard } from '../components/QuestionCard';
-import { mockWorkbooks } from '../mock/studentMockData';
+import { useAuth } from '../state/AuthContext';
 import { useSolveProgress } from '../state/SolveProgressContext';
-import { useSubmissionHistory } from '../state/SubmissionHistoryContext';
+import { useStudentData } from '../state/StudentDataContext';
 import type { ScreenProps } from '../types/navigation';
-import type { StudentAnswer } from '../types/student';
-import { gradeWorkbook } from '../utils/gradeWorkbook';
+import type { StudentAnswer, Workbook } from '../types/student';
 import { createInitialSolveState, upsertStudentAnswer } from '../utils/solveProgress';
 import { getStartProgressStatus, resolveWorkbookStatus } from '../utils/workbookStatus';
 
 export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'WorkbookSolve'>) {
-  const workbook = mockWorkbooks.find((item) => item.id === route.params.workbookId);
-  const { addSubmission } = useSubmissionHistory();
+  const { isAuthenticated } = useAuth();
+  const { errorMessage, getWorkbookDetail, isLoading, submitWorkbook, workbooks } = useStudentData();
+  const [workbook, setWorkbook] = useState<Workbook | null>(
+    () => workbooks.find((item) => item.id === route.params.workbookId) ?? null,
+  );
   const { getProgress, saveProgress, startProgress, submitProgress } = useSolveProgress();
   const savedProgress = getProgress(route.params.workbookId);
   const initialState = workbook
@@ -22,6 +24,24 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
     : { currentQuestionIndex: 0, answers: [] as StudentAnswer[] };
   const [currentIndex, setCurrentIndex] = useState(initialState.currentQuestionIndex);
   const [answers, setAnswers] = useState<StudentAnswer[]>(initialState.answers);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    getWorkbookDetail(route.params.workbookId).then((detail) => {
+      if (detail) {
+        setWorkbook(detail);
+        const nextInitialState = createInitialSolveState(detail, savedProgress);
+        setCurrentIndex(nextInitialState.currentQuestionIndex);
+        setAnswers(nextInitialState.answers);
+      }
+    });
+  }, [getWorkbookDetail, route.params.workbookId, savedProgress]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigation.replace('Login');
+    }
+  }, [isAuthenticated, navigation]);
 
   useEffect(() => {
     if (workbook) {
@@ -35,7 +55,10 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
   if (!workbook || workbook.questions.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyTitle}>풀이할 문제가 없습니다.</Text>
+        <Text style={styles.emptyTitle}>
+          {isLoading ? '문제를 불러오는 중입니다.' : '풀이할 문제가 없습니다.'}
+        </Text>
+        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
         <PrimaryButton onPress={() => navigation.goBack()}>돌아가기</PrimaryButton>
       </View>
     );
@@ -58,12 +81,20 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
     saveProgress(workbook.id, nextIndex, answers);
   };
 
-  const submit = () => {
-    const result = gradeWorkbook(workbook, answers);
+  const submit = async () => {
+    setIsSubmitting(true);
 
-    addSubmission(result);
-    submitProgress(workbook.id, answers);
-    navigation.replace('Result', { result });
+    try {
+      const result = await submitWorkbook(workbook.id, answers.map((answer) => ({
+        workbookQuestionId: answer.questionId,
+        selectedChoiceId: answer.selectedChoiceId,
+      })));
+
+      submitProgress(workbook.id, answers);
+      navigation.replace('Result', { result });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -99,7 +130,9 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
         </View>
         <View style={styles.buttonItem}>
           {isLastQuestion ? (
-            <PrimaryButton disabled={!currentAnswer} onPress={submit}>제출하기</PrimaryButton>
+            <PrimaryButton disabled={!currentAnswer || isSubmitting} onPress={submit}>
+              {isSubmitting ? '제출 중...' : '제출하기'}
+            </PrimaryButton>
           ) : (
             <PrimaryButton
               disabled={!currentAnswer}
@@ -185,6 +218,12 @@ const styles = StyleSheet.create({
     color: '#172554',
     fontSize: 20,
     fontWeight: '900',
+    textAlign: 'center',
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 13,
+    fontWeight: '800',
     textAlign: 'center',
   },
 });

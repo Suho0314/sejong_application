@@ -1,17 +1,16 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ScoreSummaryCard } from '../components/ScoreSummaryCard';
-import { useSubmissionHistory } from '../state/SubmissionHistoryContext';
-import type { Cohort, Student } from '../types/student';
+import type { Cohort, Student, SubmissionRecord } from '../types/student';
 import { calculateStudentPerformance } from '../utils/studentPerformance';
 
 type ProfileScreenProps = {
   student: Student;
   cohort: Cohort;
+  submissions: SubmissionRecord[];
 };
 
-export function ProfileScreen({ student, cohort }: ProfileScreenProps) {
-  const { submissions } = useSubmissionHistory();
+export function ProfileScreen({ student, cohort, submissions }: ProfileScreenProps) {
   const summary = calculateStudentPerformance(submissions, cohort.id);
 
   return (
