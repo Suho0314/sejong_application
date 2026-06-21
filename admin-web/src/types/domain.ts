@@ -6,7 +6,7 @@ export type Difficulty = 'easy' | 'medium' | 'hard';
 export type QuestionType = 'multiple_choice';
 export type ContentStatus = 'draft' | 'published' | 'archived';
 export type AssignmentStatus = 'scheduled' | 'open' | 'closed';
-export type SubmissionStatus = 'in_progress' | 'submitted';
+export type SubmissionStatus = 'in_progress' | 'submitted' | 'graded';
 
 export type User = {
   id: string;
