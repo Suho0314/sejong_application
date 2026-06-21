@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { QuestionStatusOptions } from '../../constants/statusLabels';
 import { ContentStatus, Difficulty, QuestionType } from '../../types/domain';
 
 export type QuestionFormValues = {
@@ -14,6 +15,7 @@ export type QuestionFormValues = {
 };
 
 type QuestionFormProps = {
+  disabled?: boolean;
   initialValues?: QuestionFormValues;
   mode: 'create' | 'edit';
   onCancel: () => void;
@@ -32,7 +34,7 @@ const emptyValues: QuestionFormValues = {
   status: 'draft',
 };
 
-export function QuestionForm({ initialValues, mode, onCancel, onSubmit }: QuestionFormProps) {
+export function QuestionForm({ disabled = false, initialValues, mode, onCancel, onSubmit }: QuestionFormProps) {
   const [values, setValues] = useState<QuestionFormValues>(initialValues ?? emptyValues);
 
   useEffect(() => {
@@ -61,6 +63,7 @@ export function QuestionForm({ initialValues, mode, onCancel, onSubmit }: Questi
         <span>문제 내용</span>
         <textarea
           required
+          disabled={disabled}
           value={values.content}
           onChange={(event) => setValues((current) => ({ ...current, content: event.target.value }))}
           placeholder="학생에게 보여질 실제 문제 내용을 입력하세요."
@@ -72,6 +75,7 @@ export function QuestionForm({ initialValues, mode, onCancel, onSubmit }: Questi
           <span>과목</span>
           <input
             required
+            disabled={disabled}
             value={values.subject}
             onChange={(event) => setValues((current) => ({ ...current, subject: event.target.value }))}
             placeholder="예: 기본간호학"
@@ -80,6 +84,7 @@ export function QuestionForm({ initialValues, mode, onCancel, onSubmit }: Questi
         <label>
           <span>카테고리</span>
           <input
+            disabled={disabled}
             value={values.category}
             onChange={(event) => setValues((current) => ({ ...current, category: event.target.value }))}
             placeholder="예: 활력징후"
@@ -88,6 +93,7 @@ export function QuestionForm({ initialValues, mode, onCancel, onSubmit }: Questi
         <label>
           <span>난이도</span>
           <select
+            disabled={disabled}
             value={values.difficulty}
             onChange={(event) => setValues((current) => ({ ...current, difficulty: event.target.value as Difficulty }))}
           >
@@ -104,6 +110,7 @@ export function QuestionForm({ initialValues, mode, onCancel, onSubmit }: Questi
             <span>보기 {index + 1}</span>
             <input
               required
+              disabled={disabled}
               value={choice}
               onChange={(event) => handleChoiceChange(index, event.target.value)}
               placeholder={`보기 ${index + 1}`}
@@ -115,6 +122,7 @@ export function QuestionForm({ initialValues, mode, onCancel, onSubmit }: Questi
       <label>
         <span>정답</span>
         <select
+          disabled={disabled}
           value={values.correctAnswerIndex}
           onChange={(event) =>
             setValues((current) => ({ ...current, correctAnswerIndex: Number(event.target.value) }))
@@ -132,6 +140,7 @@ export function QuestionForm({ initialValues, mode, onCancel, onSubmit }: Questi
       <label>
         <span>해설</span>
         <textarea
+          disabled={disabled}
           value={values.explanation}
           onChange={(event) => setValues((current) => ({ ...current, explanation: event.target.value }))}
           placeholder="정답 해설을 입력하세요."
@@ -141,21 +150,24 @@ export function QuestionForm({ initialValues, mode, onCancel, onSubmit }: Questi
       <label>
         <span>상태</span>
         <select
+          disabled={disabled}
           value={values.status}
           onChange={(event) => setValues((current) => ({ ...current, status: event.target.value as ContentStatus }))}
         >
-          <option value="draft">초안</option>
-          <option value="published">게시</option>
-          <option value="archived">보관</option>
+          {QuestionStatusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </label>
 
       <div className="form-actions">
-        <button className="secondary-button" type="button" onClick={onCancel}>
+        <button className="secondary-button" type="button" onClick={onCancel} disabled={disabled}>
           취소
         </button>
-        <button className="primary-button" type="submit">
-          {mode === 'create' ? '추가' : '저장'}
+        <button className="primary-button" type="submit" disabled={disabled}>
+          {disabled ? '저장 중...' : mode === 'create' ? '추가' : '저장'}
         </button>
       </div>
     </form>

@@ -1,4 +1,5 @@
 import { CSSProperties } from 'react';
+import { QuestionStatusLabel } from '../../constants/statusLabels';
 import { ContentStatus, Difficulty, QuestionType } from '../../types/domain';
 
 export type QuestionRow = {
@@ -27,12 +28,6 @@ const difficultyLabels: Record<Difficulty, string> = {
   easy: '쉬움',
   medium: '보통',
   hard: '어려움',
-};
-
-const statusLabels: Record<ContentStatus, string> = {
-  draft: '초안',
-  published: '게시',
-  archived: '보관',
 };
 
 const formatDate = (value: string) =>
@@ -76,14 +71,14 @@ export function QuestionTable({ questions, onDelete, onEdit }: QuestionTableProp
                 </div>
                 <span className="table-subtitle">
                   {question.subject} │ {question.category || '미분류'} │ {difficultyLabels[question.difficulty]} │{' '}
-                  {statusLabels[question.status]}
+                  {QuestionStatusLabel[question.status]}
                 </span>
               </td>
               <td>{question.subject}</td>
               <td>{question.category || '-'}</td>
               <td>{difficultyLabels[question.difficulty]}</td>
               <td>
-                <span className={`status-pill status-${question.status}`}>{statusLabels[question.status]}</span>
+                <span className={`status-pill status-${question.status}`}>{QuestionStatusLabel[question.status]}</span>
               </td>
               <td>보기 {question.correctAnswerIndex + 1}</td>
               <td>{formatDate(question.createdAt)}</td>

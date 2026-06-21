@@ -211,6 +211,21 @@ th {
   color: #475569;
 }
 
+.status-draft {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.status-published {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-archived {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .status-planned {
   background: #f1f5f9;
   color: #475569;
