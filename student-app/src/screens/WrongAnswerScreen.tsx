@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { WrongAnswerCard } from '../components/WrongAnswerCard';
@@ -8,11 +9,42 @@ import { buildWrongAnswerHistory } from '../utils/wrongAnswerHistory';
 type WrongAnswerScreenProps = {
   cohortId: string;
   submissions: SubmissionRecord[];
-  onSubmissionPress: (submissionId: string) => void;
 };
 
-export function WrongAnswerScreen({ cohortId, submissions, onSubmissionPress }: WrongAnswerScreenProps) {
-  const wrongAnswerHistory = buildWrongAnswerHistory(submissions, cohortId);
+export function WrongAnswerScreen({ cohortId, submissions }: WrongAnswerScreenProps) {
+  const wrongAnswerHistory = useMemo(
+    () => buildWrongAnswerHistory(submissions, cohortId),
+    [cohortId, submissions],
+  );
+  const [expandedWorkbookIds, setExpandedWorkbookIds] = useState<Set<string>>(new Set());
+  const initializedDefaultKey = useRef<string | null>(null);
+  const mostRecentGroup = wrongAnswerHistory[0];
+  const defaultGroupKey = mostRecentGroup
+    ? `${cohortId}:${mostRecentGroup.workbookId}:${mostRecentGroup.latestSubmittedAt}`
+    : `${cohortId}:empty`;
+
+  useEffect(() => {
+    if (initializedDefaultKey.current === defaultGroupKey) return;
+
+    initializedDefaultKey.current = defaultGroupKey;
+    setExpandedWorkbookIds(
+      mostRecentGroup ? new Set([mostRecentGroup.workbookId]) : new Set(),
+    );
+  }, [defaultGroupKey, mostRecentGroup]);
+
+  const toggleWorkbookGroup = (workbookId: string) => {
+    setExpandedWorkbookIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(workbookId)) {
+        next.delete(workbookId);
+      } else {
+        next.add(workbookId);
+      }
+
+      return next;
+    });
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -26,27 +58,42 @@ export function WrongAnswerScreen({ cohortId, submissions, onSubmissionPress }: 
       {wrongAnswerHistory.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyIcon}>✓</Text>
-          <Text style={styles.emptyTitle}>정리할 오답이 없습니다</Text>
+          <Text style={styles.emptyTitle}>아직 오답이 없습니다.</Text>
           <Text style={styles.emptyDescription}>
             문제집을 제출하고 틀린 문제가 생기면 이곳에 표시됩니다.
           </Text>
         </View>
       ) : (
         <View style={styles.historyList}>
-          {wrongAnswerHistory.map((history) => (
-              <Pressable
-                key={history.submissionId}
-                style={styles.historyGroup}
-                onPress={() => onSubmissionPress(history.submissionId)}
-              >
-                <WrongAnswerSummaryCard history={history} />
-                <View style={styles.answerList}>
-                  {history.wrongAnswers.map((answer, index) => (
-                    <WrongAnswerCard key={answer.questionId} answer={answer} index={index} />
-                  ))}
-                </View>
-              </Pressable>
-          ))}
+          {wrongAnswerHistory.map((history) => {
+            const isExpanded = expandedWorkbookIds.has(history.workbookId);
+
+            return (
+              <View key={history.workbookId} style={styles.historyGroup}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: isExpanded }}
+                  accessibilityLabel={`${history.workbookTitle}, 오답 ${history.wrongAnswers.length}개`}
+                  onPress={() => toggleWorkbookGroup(history.workbookId)}
+                >
+                  <WrongAnswerSummaryCard history={history} isExpanded={isExpanded} />
+                </Pressable>
+
+                {isExpanded ? (
+                  <View style={styles.answerList}>
+                    {history.wrongAnswers.map((answer, index) => (
+                      <WrongAnswerCard
+                        key={answer.questionId}
+                        answer={answer}
+                        index={index}
+                        showExplanation
+                      />
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
       )}
     </ScrollView>

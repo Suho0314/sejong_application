@@ -4,6 +4,7 @@ import type { WrongAnswerHistoryGroup } from '../types/student';
 
 type WrongAnswerSummaryCardProps = {
   history: WrongAnswerHistoryGroup;
+  isExpanded: boolean;
 };
 
 function formatSubmittedAt(value: string) {
@@ -22,12 +23,17 @@ function formatSubmittedAt(value: string) {
   });
 }
 
-export function WrongAnswerSummaryCard({ history }: WrongAnswerSummaryCardProps) {
+export function WrongAnswerSummaryCard({ history, isExpanded }: WrongAnswerSummaryCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>{history.workbookTitle}</Text>
-        <Text style={styles.wrongBadge}>오답 {history.wrongAnswers.length}개</Text>
+        <View style={styles.headerActions}>
+          <Text style={styles.wrongBadge}>오답 {history.wrongAnswers.length}개</Text>
+          <View style={styles.toggleIcon}>
+            <Text style={styles.toggleIconText}>{isExpanded ? '⌃' : '⌄'}</Text>
+          </View>
+        </View>
       </View>
 
       <Text style={styles.submittedAt}>
@@ -73,6 +79,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 26,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   wrongBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -82,6 +93,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     fontSize: 11,
     fontWeight: '900',
+  },
+  toggleIcon: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: '#EFF6FF',
+  },
+  toggleIconText: {
+    color: '#2563EB',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 20,
   },
   submittedAt: {
     marginTop: 7,

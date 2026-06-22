@@ -53,5 +53,10 @@ export function buildWrongAnswerHistory(
       ...group,
       wrongAnswers: Array.from(answerByQuestionId.values()),
     }))
-    .filter((group) => group.wrongAnswers.length > 0);
+    .filter((group) => group.wrongAnswers.length > 0)
+    .sort(
+      (left, right) =>
+        new Date(right.latestSubmittedAt).getTime() -
+        new Date(left.latestSubmittedAt).getTime(),
+    );
 }
