@@ -140,6 +140,27 @@ a {
   overflow: hidden;
 }
 
+.dashboard-state-panel {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding: 28px;
+}
+
+.dashboard-state-panel strong {
+  font-size: 17px;
+}
+
+.dashboard-state-panel p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.dashboard-state-panel .primary-button {
+  margin-top: 8px;
+}
+
 .panel-header {
   display: flex;
   align-items: center;
