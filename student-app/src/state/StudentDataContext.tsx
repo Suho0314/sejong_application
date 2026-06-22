@@ -8,6 +8,7 @@ import {
 } from '../api/student';
 import { getStudentAccessToken } from '../api/auth';
 import type { Cohort, GradedAnswer, SubmissionRecord, SubmissionResult, Workbook } from '../types/student';
+import { isAttemptLimitExceededError } from '../utils/submissionAttempt';
 import { useAuth } from './AuthContext';
 
 type StudentDataContextValue = {
@@ -40,6 +41,8 @@ const toWorkbook = (assignment: StudentAssignmentApiItem): Workbook => ({
   totalQuestions: assignment.questions?.length ?? assignment.questionCount,
   estimatedMinutes: Math.max(5, (assignment.questions?.length ?? assignment.questionCount) * 2),
   status: assignment.learningStatus === 'submitted' ? 'submitted' : 'notStarted',
+  maxAttempts: assignment.maxAttempts,
+  submittedCount: assignment.submittedCount,
   correctRate: assignment.latestScore ?? undefined,
   questions: (assignment.questions ?? []).map((question) => ({
     id: question.workbookQuestionId,
@@ -67,6 +70,7 @@ const toResult = (submission: ResultSource): SubmissionResult => {
     correctChoiceId: answer.correctChoiceId ?? '',
     correctChoiceText: ('correctChoiceText' in answer ? answer.correctChoiceText : answer.correctAnswer) ?? '-',
     isCorrect: answer.isCorrect,
+    explanation: answer.explanation,
   }));
 
   return {
@@ -220,7 +224,11 @@ export function StudentDataProvider({ children }: PropsWithChildren) {
       await refresh();
       return record.result;
     } catch (error) {
-      handleError(error, '답안을 제출하지 못했습니다.');
+      if (isAttemptLimitExceededError(error)) {
+        setErrorMessage('');
+      } else {
+        handleError(error, '답안을 제출하지 못했습니다.');
+      }
       throw error;
     } finally {
       setIsLoading(false);

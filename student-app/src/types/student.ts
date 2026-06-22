@@ -36,6 +36,8 @@ export type Workbook = {
   totalQuestions: number;
   estimatedMinutes: number;
   status: WorkbookStatus;
+  maxAttempts?: number;
+  submittedCount?: number;
   correctRate?: number;
   questions: Question[];
 };
@@ -64,6 +66,7 @@ export type GradedAnswer = {
   correctChoiceId: string;
   correctChoiceText: string;
   isCorrect: boolean;
+  explanation?: string | null;
 };
 
 export type SubmissionResult = {

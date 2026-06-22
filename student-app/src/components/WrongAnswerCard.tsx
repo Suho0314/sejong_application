@@ -5,9 +5,10 @@ import type { GradedAnswer } from '../types/student';
 type WrongAnswerCardProps = {
   answer: GradedAnswer;
   index: number;
+  showExplanation?: boolean;
 };
 
-export function WrongAnswerCard({ answer, index }: WrongAnswerCardProps) {
+export function WrongAnswerCard({ answer, index, showExplanation = false }: WrongAnswerCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -51,13 +52,22 @@ export function WrongAnswerCard({ answer, index }: WrongAnswerCardProps) {
               <Text style={styles.choiceText}>{choice.text}</Text>
 
               <View style={styles.choiceBadges}>
-                {selected ? <Text style={styles.selectedBadge}>내 선택</Text> : null}
+                {selected ? <Text style={styles.selectedBadge}>내 답</Text> : null}
                 {correct ? <Text style={styles.correctBadge}>정답</Text> : null}
               </View>
             </View>
           );
         })}
       </View>
+
+      {showExplanation ? (
+        <View style={styles.explanationBox}>
+          <Text style={styles.explanationLabel}>해설</Text>
+          <Text style={styles.explanationText}>
+            {answer.explanation?.trim() || '등록된 해설이 없습니다.'}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -171,5 +181,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#DBEAFE',
     fontSize: 10,
     fontWeight: '900',
+  },
+  explanationBox: {
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+  },
+  explanationLabel: {
+    color: '#1D4ED8',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  explanationText: {
+    marginTop: 6,
+    color: '#475569',
+    fontSize: 13,
+    lineHeight: 20,
   },
 });

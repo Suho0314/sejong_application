@@ -94,7 +94,6 @@ export function MainScreen({ navigation, route }: ScreenProps<'Main'>) {
         <WrongAnswerScreen
           cohortId={cohort.id}
           submissions={submissions}
-          onSubmissionPress={(submissionId) => navigation.navigate('Result', { submissionId })}
         />
       );
     }

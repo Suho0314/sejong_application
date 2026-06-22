@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -9,6 +9,12 @@ import { useStudentData } from '../state/StudentDataContext';
 import type { ScreenProps } from '../types/navigation';
 import type { StudentAnswer, Workbook } from '../types/student';
 import { createInitialSolveState, upsertStudentAnswer } from '../utils/solveProgress';
+import { showAlert } from '../utils/showAlert';
+import {
+  ATTEMPT_LIMIT_MESSAGE,
+  hasReachedAttemptLimit,
+  isAttemptLimitExceededError,
+} from '../utils/submissionAttempt';
 import { getStartProgressStatus, resolveWorkbookStatus } from '../utils/workbookStatus';
 
 export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'WorkbookSolve'>) {
@@ -25,6 +31,7 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
   const [currentIndex, setCurrentIndex] = useState(initialState.currentQuestionIndex);
   const [answers, setAnswers] = useState<StudentAnswer[]>(initialState.answers);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     getWorkbookDetail(route.params.workbookId).then((detail) => {
@@ -82,6 +89,14 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
   };
 
   const submit = async () => {
+    if (submittingRef.current) return;
+
+    if (hasReachedAttemptLimit(workbook)) {
+      showAlert(ATTEMPT_LIMIT_MESSAGE);
+      return;
+    }
+
+    submittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -92,7 +107,14 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
 
       submitProgress(workbook.id, answers);
       navigation.replace('Result', { result });
+    } catch (error) {
+      if (isAttemptLimitExceededError(error)) {
+        showAlert(ATTEMPT_LIMIT_MESSAGE);
+      } else {
+        showAlert('제출 중 오류가 발생했습니다. 다시 시도해주세요.', '제출 실패');
+      }
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -122,7 +144,7 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
         <View style={styles.buttonItem}>
           <PrimaryButton
             variant="light"
-            disabled={currentIndex === 0}
+            disabled={currentIndex === 0 || isSubmitting}
             onPress={() => moveToQuestion(currentIndex - 1)}
           >
             이전 문제
