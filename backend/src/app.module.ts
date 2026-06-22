@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { CohortsModule } from './admin/cohorts/cohorts.module';
+import { DashboardModule } from './admin/dashboard/dashboard.module';
 import { QuestionsModule } from './admin/questions/questions.module';
 import { StudentsModule } from './admin/students/students.module';
 import { WorkbookAssignmentsModule } from './admin/workbook-assignments/workbook-assignments.module';
@@ -19,6 +20,7 @@ import { SubmissionsModule } from './submissions/submissions.module';
     }),
     DatabaseModule,
     AuthModule,
+    DashboardModule,
     CohortsModule,
     QuestionsModule,
     StudentsModule,
