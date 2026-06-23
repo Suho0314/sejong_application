@@ -3,8 +3,21 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen } from '../components/Screen';
+import { ApiConfigurationError, ApiError, ApiNetworkError } from '../api/client';
 import { useAuth } from '../state/AuthContext';
 import type { ScreenProps } from '../types/navigation';
+
+const getLoginErrorMessage = (error: unknown) => {
+  if (error instanceof ApiNetworkError || error instanceof ApiConfigurationError) {
+    return error.message;
+  }
+
+  if (error instanceof ApiError && error.status === 401) {
+    return '아이디 또는 비밀번호가 올바르지 않습니다.';
+  }
+
+  return '로그인 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+};
 
 export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
   const { expiredMessage, isAuthenticated, login, user } = useAuth();
@@ -27,7 +40,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
       await login(id, password);
       navigation.replace('CohortSelect');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : '로그인에 실패했습니다.');
+      setErrorMessage(getLoginErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
