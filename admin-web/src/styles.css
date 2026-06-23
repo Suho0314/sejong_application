@@ -606,6 +606,36 @@ th {
   font-weight: 800;
 }
 
+.workbook-score-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+  padding: 14px 16px;
+}
+
+.workbook-score-toolbar strong {
+  display: block;
+  font-size: 14px;
+}
+
+.workbook-score-toolbar p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.score-total-ok {
+  color: #166534;
+}
+
+.score-total-warning {
+  color: #b45309;
+}
+
 .drop-zone {
   display: grid;
   gap: 12px;
@@ -701,7 +731,8 @@ th {
   }
 
   .toolbar,
-  .pagination {
+  .pagination,
+  .workbook-score-toolbar {
     align-items: stretch;
     flex-direction: column;
   }
