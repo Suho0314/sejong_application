@@ -129,7 +129,7 @@ export function MainScreen({ navigation, route }: ScreenProps<'Main'>) {
         subtitle={cohort.courseName}
         onProfilePress={() => setActiveTab('profile')}
       />
-      {renderContent()}
+      <View style={styles.contentArea}>{renderContent()}</View>
       <BottomTabBar activeTab={activeTab} onChange={setActiveTab} />
     </View>
   );
@@ -139,6 +139,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F3F4F6',
+  },
+  contentArea: {
+    flex: 1,
+    minHeight: 0,
   },
   centerCard: {
     flex: 1,
