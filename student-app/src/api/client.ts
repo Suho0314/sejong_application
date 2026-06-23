@@ -1,14 +1,34 @@
 import { appStorage } from './storage';
 
-const DEFAULT_API_BASE_URL = 'http://localhost:3000';
+const DEFAULT_API_BASE_URL = 'https://sejongapplication-production.up.railway.app';
 export const ACCESS_TOKEN_STORAGE_KEY = 'sejong_student_access_token';
 export const USER_STORAGE_KEY = 'sejong_student_user';
 const AUTH_EXPIRED_MESSAGE_STORAGE_KEY = 'sejong_student_auth_expired_message';
 const AUTH_EXPIRED_MESSAGE = '로그인이 만료되었습니다. 다시 로그인해주세요.';
+const API_CONFIGURATION_ERROR_MESSAGE =
+  'API 서버 주소 설정이 올바르지 않습니다. EXPO_PUBLIC_API_BASE_URL을 확인해주세요.';
+const NETWORK_ERROR_MESSAGE = '서버에 연결할 수 없습니다. 네트워크 상태를 확인한 뒤 다시 시도해주세요.';
 
 type ApiRequestOptions = RequestInit & {
   auth?: boolean;
 };
+
+export class ApiConfigurationError extends Error {
+  constructor(message = API_CONFIGURATION_ERROR_MESSAGE) {
+    super(message);
+    this.name = 'ApiConfigurationError';
+  }
+}
+
+export class ApiNetworkError extends Error {
+  cause: unknown;
+
+  constructor(message = NETWORK_ERROR_MESSAGE, cause?: unknown) {
+    super(message);
+    this.name = 'ApiNetworkError';
+    this.cause = cause;
+  }
+}
 
 export class ApiError extends Error {
   status: number;
@@ -23,8 +43,23 @@ export class ApiError extends Error {
 }
 
 const getApiBaseUrl = () => {
-  const env = process.env.EXPO_PUBLIC_API_BASE_URL ?? process.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL;
-  return env.replace(/\/$/, '').replace(/\/api$/, '');
+  const env =
+    process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ||
+    process.env.VITE_API_BASE_URL?.trim() ||
+    DEFAULT_API_BASE_URL;
+  const normalizedUrl = env.replace(/\/$/, '').replace(/\/api$/, '');
+
+  try {
+    const parsedUrl = new URL(normalizedUrl);
+
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      throw new Error('Unsupported API protocol');
+    }
+  } catch {
+    throw new ApiConfigurationError();
+  }
+
+  return normalizedUrl;
 };
 
 const resolveApiUrl = (path: string) => {
@@ -90,10 +125,17 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     }
   }
 
-  const response = await fetch(resolveApiUrl(path), {
-    ...requestOptions,
-    headers: requestHeaders,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(resolveApiUrl(path), {
+      ...requestOptions,
+      headers: requestHeaders,
+    });
+  } catch (error) {
+    throw new ApiNetworkError(undefined, error);
+  }
+
   const text = await response.text();
   const body = text ? JSON.parse(text) : null;
 
