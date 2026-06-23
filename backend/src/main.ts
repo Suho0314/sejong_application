@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
-const LOCAL_DEVELOPMENT_ORIGINS = [
+const LOCAL_ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:8081',
@@ -20,7 +20,6 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const port = Number(configService.get<string>('PORT') ?? '3000');
-  const isProduction = configService.get<string>('NODE_ENV') === 'production';
   const configuredOrigins = (configService.get<string>('CORS_ORIGIN') ?? '')
     .split(',')
     .map(normalizeOrigin)
@@ -34,10 +33,7 @@ async function bootstrap() {
     throw new Error('CORS_ORIGIN must contain explicit origins, not "*".');
   }
 
-  const allowedOrigins = new Set([
-    ...configuredOrigins,
-    ...(isProduction ? [] : LOCAL_DEVELOPMENT_ORIGINS),
-  ]);
+  const allowedOrigins = new Set([...LOCAL_ALLOWED_ORIGINS, ...configuredOrigins]);
 
   app.setGlobalPrefix('api');
   app.enableCors({
