@@ -31,7 +31,6 @@ type WorkbookQuestionRow = {
   questionId: string;
   sequence: number;
   points: number;
-  isRequired: boolean;
   questionContent?: string;
 };
 
@@ -107,7 +106,6 @@ const toWorkbookQuestionRow = (item: WorkbookQuestionApiItem): WorkbookQuestionR
   questionId: item.questionId,
   sequence: item.sequence,
   points: item.points,
-  isRequired: item.isRequired,
   questionContent: item.question?.content,
 });
 
@@ -359,7 +357,6 @@ export function WorkbookPage() {
         questionId: question.id,
         sequence: current.length + 1,
         points: 10,
-        isRequired: true,
         questionContent: question.content,
       },
     ]);
@@ -384,7 +381,7 @@ export function WorkbookPage() {
     });
   };
 
-  const updateQuestionConfig = (questionId: string, patch: Partial<Pick<WorkbookQuestionRow, 'points' | 'isRequired'>>) => {
+  const updateQuestionConfig = (questionId: string, patch: Partial<Pick<WorkbookQuestionRow, 'points'>>) => {
     setSelectedItems((current) =>
       current.map((item) =>
         item.questionId === questionId
@@ -413,7 +410,7 @@ export function WorkbookPage() {
           questionId: item.questionId,
           sequence: index + 1,
           points: item.points,
-          isRequired: item.isRequired,
+          isRequired: true,
         })),
       });
       await Promise.all([loadWorkbookDetail(selectedWorkbookId), loadWorkbooks()]);
@@ -708,18 +705,6 @@ export function WorkbookPage() {
                             updateQuestionConfig(item.questionId, { points: Number(event.target.value) })
                           }
                         />
-                      </label>
-                      <label className="search-field">
-                        <span>필수</span>
-                        <select
-                          value={item.isRequired ? 'true' : 'false'}
-                          onChange={(event) =>
-                            updateQuestionConfig(item.questionId, { isRequired: event.target.value === 'true' })
-                          }
-                        >
-                          <option value="true">필수</option>
-                          <option value="false">선택</option>
-                        </select>
                       </label>
                       <button
                         className="secondary-button"
