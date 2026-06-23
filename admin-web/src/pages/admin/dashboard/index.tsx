@@ -65,7 +65,7 @@ export function DashboardPage() {
   const recentAssignments = dashboard?.recentAssignments ?? [];
   const recentSubmissions = dashboard?.recentSubmissions ?? [];
   const stats = [
-    { label: '학생수', value: summary.totalStudents.toLocaleString('ko-KR'), note: '전체 등록 학생' },
+    { label: '전체 학생수', value: summary.totalStudents.toLocaleString('ko-KR'), note: 'students 전체' },
     { label: '기수수', value: summary.totalCohorts.toLocaleString('ko-KR'), note: '전체 기수' },
     { label: '문제집수', value: summary.totalWorkbooks.toLocaleString('ko-KR'), note: '생성된 문제집' },
     {

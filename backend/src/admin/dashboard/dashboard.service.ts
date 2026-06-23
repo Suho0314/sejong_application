@@ -18,9 +18,6 @@ export class DashboardService {
           (
             SELECT COUNT(*)
             FROM students
-            JOIN users ON users.id = students.user_id
-            WHERE students.deleted_at IS NULL
-              AND users.deleted_at IS NULL
           ) AS total_students,
           (
             SELECT COUNT(*)
