@@ -47,6 +47,9 @@ export function WorkbookDetailScreen({ navigation, route }: ScreenProps<'Workboo
     );
   }
 
+  const questions = Array.isArray(workbook.questions) ? workbook.questions : [];
+  const questionCount = questions.length;
+  const hasQuestions = questionCount > 0;
   const effectiveStatus = resolveWorkbookStatus(workbook, solveProgress);
   const buttonLabel = getWorkbookActionLabel(effectiveStatus);
 
@@ -55,11 +58,11 @@ export function WorkbookDetailScreen({ navigation, route }: ScreenProps<'Workboo
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.heroCard}>
           <View style={styles.badgeRow}>
-            <Text style={styles.subject}>{workbook.subject}</Text>
+            <Text style={styles.subject}>{workbook.subject ?? '간호학'}</Text>
             <Text style={styles.status}>{workbookStatusLabel[effectiveStatus]}</Text>
           </View>
-          <Text style={styles.title}>{workbook.title}</Text>
-          <Text style={styles.description}>{workbook.description}</Text>
+          <Text style={styles.title}>{workbook.title ?? '제목 없는 문제집'}</Text>
+          <Text style={styles.description}>{workbook.description ?? '배포된 문제집입니다.'}</Text>
         </View>
 
         {isActiveWorkbookStatus(effectiveStatus) && solveProgress ? (
@@ -78,35 +81,45 @@ export function WorkbookDetailScreen({ navigation, route }: ScreenProps<'Workboo
           <Text style={styles.sectionTitle}>문제집 정보</Text>
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
-              <Text style={styles.infoValue}>{workbook.totalQuestions}</Text>
+              <Text style={styles.infoValue}>{questionCount || workbook.totalQuestions || 0}</Text>
               <Text style={styles.infoLabel}>총 문항</Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.infoItem}>
-              <Text style={styles.infoValue}>{workbook.estimatedMinutes}분</Text>
+              <Text style={styles.infoValue}>{workbook.estimatedMinutes ?? 0}분</Text>
               <Text style={styles.infoLabel}>예상 시간</Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.infoItem}>
-              <Text style={styles.infoValue}>{workbook.chapterCount}</Text>
+              <Text style={styles.infoValue}>{workbook.chapterCount ?? 0}</Text>
               <Text style={styles.infoLabel}>챕터</Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.guideCard}>
-          <Text style={styles.sectionTitle}>풀이 안내</Text>
-          <Text style={styles.guideText}>• 선택한 답안은 문제를 이동해도 유지됩니다.</Text>
-          <Text style={styles.guideText}>• 마지막 문제에서 제출할 수 있습니다.</Text>
-          <Text style={styles.guideText}>• 진행 상태는 앱을 종료하기 전까지 임시 저장됩니다.</Text>
-        </View>
+        {hasQuestions ? (
+          <View style={styles.guideCard}>
+            <Text style={styles.sectionTitle}>풀이 안내</Text>
+            <Text style={styles.guideText}>• 선택한 답안은 문제를 이동해도 유지됩니다.</Text>
+            <Text style={styles.guideText}>• 마지막 문제에서 제출할 수 있습니다.</Text>
+            <Text style={styles.guideText}>• 진행 상태는 앱을 종료하기 전까지 임시 저장됩니다.</Text>
+          </View>
+        ) : (
+          <View style={styles.emptyQuestionCard}>
+            <Text style={styles.emptyQuestionTitle}>문항이 없습니다</Text>
+            <Text style={styles.emptyQuestionDescription}>
+              배포된 문제집에 문항이 추가된 뒤 다시 풀이할 수 있습니다.
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
         <PrimaryButton
+          disabled={!hasQuestions}
           onPress={() => navigation.navigate('WorkbookSolve', { workbookId: workbook.id })}
         >
-          {buttonLabel}
+          {hasQuestions ? buttonLabel : '문항이 없습니다'}
         </PrimaryButton>
       </View>
     </View>
@@ -222,6 +235,24 @@ const styles = StyleSheet.create({
   guideText: {
     marginBottom: 8,
     color: '#334155',
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  emptyQuestionCard: {
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  emptyQuestionTitle: {
+    color: '#172554',
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  emptyQuestionDescription: {
+    marginTop: 8,
+    color: '#64748B',
     fontSize: 13,
     lineHeight: 20,
   },

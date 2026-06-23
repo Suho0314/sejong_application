@@ -16,23 +16,29 @@ export function QuestionCard({
   selectedChoiceId,
   onSelectChoice,
 }: QuestionCardProps) {
+  const choices = Array.isArray(question.choices) ? question.choices : [];
+
   return (
     <View style={styles.container}>
       <View style={styles.questionCard}>
         <Text style={styles.number}>QUESTION {questionNumber}</Text>
-        <Text style={styles.content}>{question.content}</Text>
+        <Text style={styles.content}>{question.content ?? '문항 내용이 없습니다.'}</Text>
       </View>
 
       <View style={styles.choices}>
-        {question.choices.map((choice, index) => (
-          <ChoiceOption
-            key={choice.id}
-            choice={choice}
-            index={index}
-            selected={selectedChoiceId === choice.id}
-            onPress={() => onSelectChoice(choice.id)}
-          />
-        ))}
+        {choices.length === 0 ? (
+          <Text style={styles.emptyChoices}>선택지가 없습니다.</Text>
+        ) : (
+          choices.map((choice, index) => (
+            <ChoiceOption
+              key={choice.id}
+              choice={choice}
+              index={index}
+              selected={selectedChoiceId === choice.id}
+              onPress={() => onSelectChoice(choice.id)}
+            />
+          ))
+        )}
       </View>
     </View>
   );
@@ -62,5 +68,14 @@ const styles = StyleSheet.create({
   },
   choices: {
     gap: 12,
+  },
+  emptyChoices: {
+    padding: 18,
+    borderRadius: 16,
+    color: '#64748B',
+    backgroundColor: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });

@@ -59,11 +59,13 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
     }
   }, [savedProgress, startProgress, workbook]);
 
-  if (!workbook || workbook.questions.length === 0) {
+  const questions = Array.isArray(workbook?.questions) ? workbook.questions : [];
+
+  if (!workbook || questions.length === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyTitle}>
-          {isLoading ? '문제를 불러오는 중입니다.' : '풀이할 문제가 없습니다.'}
+          {isLoading ? '문제를 불러오는 중입니다.' : '문항이 없습니다'}
         </Text>
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
         <PrimaryButton onPress={() => navigation.goBack()}>돌아가기</PrimaryButton>
@@ -71,21 +73,24 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
     );
   }
 
-  const currentQuestion = workbook.questions[currentIndex];
+  const safeCurrentIndex = Math.min(Math.max(currentIndex, 0), questions.length - 1);
+  const currentQuestion = questions[safeCurrentIndex];
   const currentAnswer = answers.find((answer) => answer.questionId === currentQuestion.id);
-  const isLastQuestion = currentIndex === workbook.questions.length - 1;
-  const progress = ((currentIndex + 1) / workbook.questions.length) * 100;
+  const isLastQuestion = safeCurrentIndex === questions.length - 1;
+  const progress = ((safeCurrentIndex + 1) / questions.length) * 100;
 
   const selectChoice = (selectedChoiceId: string) => {
     const nextAnswers = upsertStudentAnswer(answers, currentQuestion.id, selectedChoiceId);
 
     setAnswers(nextAnswers);
-    saveProgress(workbook.id, currentIndex, nextAnswers);
+    saveProgress(workbook.id, safeCurrentIndex, nextAnswers);
   };
 
   const moveToQuestion = (nextIndex: number) => {
-    setCurrentIndex(nextIndex);
-    saveProgress(workbook.id, nextIndex, answers);
+    const safeNextIndex = Math.min(Math.max(nextIndex, 0), questions.length - 1);
+
+    setCurrentIndex(safeNextIndex);
+    saveProgress(workbook.id, safeNextIndex, answers);
   };
 
   const submit = async () => {
@@ -124,7 +129,7 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
       <View style={styles.progressHeader}>
         <View style={styles.countRow}>
           <Text style={styles.workbookTitle} numberOfLines={1}>{workbook.title}</Text>
-          <Text style={styles.count}>{currentIndex + 1} / {workbook.questions.length}</Text>
+          <Text style={styles.count}>{safeCurrentIndex + 1} / {questions.length}</Text>
         </View>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${progress}%` }]} />
@@ -134,7 +139,7 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <QuestionCard
           question={currentQuestion}
-          questionNumber={currentIndex + 1}
+          questionNumber={safeCurrentIndex + 1}
           selectedChoiceId={currentAnswer?.selectedChoiceId}
           onSelectChoice={selectChoice}
         />
@@ -144,8 +149,8 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
         <View style={styles.buttonItem}>
           <PrimaryButton
             variant="light"
-            disabled={currentIndex === 0 || isSubmitting}
-            onPress={() => moveToQuestion(currentIndex - 1)}
+            disabled={safeCurrentIndex === 0 || isSubmitting}
+            onPress={() => moveToQuestion(safeCurrentIndex - 1)}
           >
             이전 문제
           </PrimaryButton>
@@ -158,7 +163,7 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
           ) : (
             <PrimaryButton
               disabled={!currentAnswer}
-              onPress={() => moveToQuestion(currentIndex + 1)}
+              onPress={() => moveToQuestion(safeCurrentIndex + 1)}
             >
               다음 문제
             </PrimaryButton>

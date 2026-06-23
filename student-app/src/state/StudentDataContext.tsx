@@ -31,23 +31,29 @@ type StudentDataContextValue = {
 
 const StudentDataContext = createContext<StudentDataContextValue | null>(null);
 
+const getAssignmentQuestions = (assignment: StudentAssignmentApiItem) =>
+  Array.isArray(assignment.questions) ? assignment.questions : [];
+
 const toWorkbook = (assignment: StudentAssignmentApiItem): Workbook => ({
   id: assignment.assignmentId,
   cohortId: assignment.cohortId,
-  title: assignment.workbookTitle,
+  title: assignment.workbookTitle ?? '제목 없는 문제집',
   description: assignment.workbookDescription ?? '배포된 문제집입니다.',
-  subject: assignment.questions?.[0]?.subject ?? '간호학',
-  chapterCount: Math.max(1, new Set(assignment.questions?.map((question) => question.category ?? '기본') ?? ['기본']).size),
-  totalQuestions: assignment.questions?.length ?? assignment.questionCount,
-  estimatedMinutes: Math.max(5, (assignment.questions?.length ?? assignment.questionCount) * 2),
+  subject: getAssignmentQuestions(assignment)[0]?.subject ?? '간호학',
+  chapterCount: Math.max(
+    1,
+    new Set(getAssignmentQuestions(assignment).map((question) => question.category ?? '기본')).size,
+  ),
+  totalQuestions: getAssignmentQuestions(assignment).length || assignment.questionCount || 0,
+  estimatedMinutes: Math.max(5, (getAssignmentQuestions(assignment).length || assignment.questionCount || 0) * 2),
   status: assignment.learningStatus === 'submitted' ? 'submitted' : 'notStarted',
   maxAttempts: assignment.maxAttempts,
   submittedCount: assignment.submittedCount,
   correctRate: assignment.latestScore ?? undefined,
-  questions: (assignment.questions ?? []).map((question) => ({
+  questions: getAssignmentQuestions(assignment).map((question) => ({
     id: question.workbookQuestionId,
-    content: question.content,
-    choices: question.choices,
+    content: question.content ?? '문항 내용이 없습니다.',
+    choices: Array.isArray(question.choices) ? question.choices : [],
     answerIndex: 0,
   })),
 });

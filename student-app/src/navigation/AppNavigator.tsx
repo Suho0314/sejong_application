@@ -1,5 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { CohortSelectScreen } from '../screens/CohortSelectScreen';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -24,13 +25,26 @@ export function AppNavigator() {
             <NavigationContainer>
               <Stack.Navigator
                 initialRouteName="Login"
-                screenOptions={{
+                screenOptions={({ navigation }) => ({
                   headerTitleAlign: 'center',
                   headerShadowVisible: false,
                   headerStyle: { backgroundColor: '#FFFFFF' },
                   headerTintColor: '#17183B',
                   contentStyle: { backgroundColor: '#F5F6F8' },
-                }}
+                  headerLeft: ({ canGoBack }) => (
+                    canGoBack ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="이전 화면으로 이동"
+                        hitSlop={12}
+                        onPress={() => navigation.goBack()}
+                        style={styles.backButton}
+                      >
+                        <Text style={styles.backButtonText}>이전</Text>
+                      </Pressable>
+                    ) : null
+                  ),
+                })}
               >
                 <Stack.Screen name="Login" component={LoginScreen} options={{ title: '로그인' }} />
                 <Stack.Screen
@@ -62,3 +76,16 @@ export function AppNavigator() {
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  backButton: {
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  backButtonText: {
+    color: '#17183B',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+});
