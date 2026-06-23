@@ -9,6 +9,7 @@ import { ContentStatus, Difficulty } from '../../../types/domain';
 
 const WORKBOOK_PAGE_SIZE = 5;
 const QUESTION_LIMIT = 100;
+const WORKBOOK_TOTAL_SCORE = 100;
 
 type QuestionRow = {
   id: string;
@@ -128,6 +129,19 @@ const reindexQuestions = (items: WorkbookQuestionRow[]) =>
     sequence: index + 1,
   }));
 
+const distributePoints = (items: WorkbookQuestionRow[]) => {
+  const count = items.length;
+  if (count === 0) return items;
+
+  const base = Math.floor(WORKBOOK_TOTAL_SCORE / count);
+  const remainder = WORKBOOK_TOTAL_SCORE % count;
+
+  return items.map((item, index) => ({
+    ...item,
+    points: index < remainder ? base + 1 : base,
+  }));
+};
+
 export function WorkbookPage() {
   const [workbooks, setWorkbooks] = useState<WorkbookApiItem[]>([]);
   const [selectedWorkbook, setSelectedWorkbook] = useState<WorkbookApiItem | null>(null);
@@ -156,6 +170,8 @@ export function WorkbookPage() {
   );
   const questionById = useMemo(() => new Map(questions.map((question) => [question.id, question])), [questions]);
   const selectedTotalScore = selectedItems.reduce((sum, item) => sum + item.points, 0);
+  const hasSelectedQuestions = selectedItems.length > 0;
+  const isSelectedTotalScoreValid = selectedTotalScore === WORKBOOK_TOTAL_SCORE;
   const workbookTotalPages = Math.max(1, Math.ceil(workbookTotalItems / WORKBOOK_PAGE_SIZE));
   const workbookCurrentPage = Math.min(workbookPage, workbookTotalPages);
 
@@ -379,6 +395,10 @@ export function WorkbookPage() {
           : item,
       ),
     );
+  };
+
+  const autoDistributePoints = () => {
+    setSelectedItems((current) => distributePoints(current));
   };
 
   const saveWorkbookQuestions = async () => {
@@ -624,6 +644,31 @@ export function WorkbookPage() {
           </div>
 
           {isDetailLoading ? <p className="table-subtitle">문제집 상세를 불러오는 중입니다.</p> : null}
+
+          {selectedWorkbook ? (
+            <div className="workbook-score-toolbar">
+              <div>
+                <strong className={isSelectedTotalScoreValid ? 'score-total-ok' : 'score-total-warning'}>
+                  {isSelectedTotalScoreValid
+                    ? `총점 정상: ${WORKBOOK_TOTAL_SCORE}점`
+                    : `현재 총점: ${selectedTotalScore}점 / ${WORKBOOK_TOTAL_SCORE}점`}
+                </strong>
+                <p>
+                  {hasSelectedQuestions
+                    ? '자동 배분은 현재 포함된 문항 수를 기준으로 다시 계산합니다.'
+                    : '문제를 먼저 추가해주세요.'}
+                </p>
+              </div>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={autoDistributePoints}
+                disabled={!hasSelectedQuestions || isSubmitting}
+              >
+                100점 자동 배분
+              </button>
+            </div>
+          ) : null}
 
           <div className="drop-zone">
             {!selectedWorkbook ? (
