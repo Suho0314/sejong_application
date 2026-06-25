@@ -34,6 +34,10 @@ secrets only in Railway, never in source files, screenshots, issue comments, or 
 | `CORS_ORIGIN` | Yes for browser clients | Comma-separated exact web origins |
 | `PORT` | No | Railway injects this automatically |
 
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` are not used in the current architecture. The
+frontends call the backend through `VITE_API_BASE_URL`; only the backend connects to
+Supabase PostgreSQL through `DATABASE_URL`.
+
 Example CORS value after the frontends are deployed:
 
 ```text

@@ -6,7 +6,7 @@ export const USER_STORAGE_KEY = 'sejong_student_user';
 const AUTH_EXPIRED_MESSAGE_STORAGE_KEY = 'sejong_student_auth_expired_message';
 const AUTH_EXPIRED_MESSAGE = '로그인이 만료되었습니다. 다시 로그인해주세요.';
 const API_CONFIGURATION_ERROR_MESSAGE =
-  'API 서버 주소 설정이 올바르지 않습니다. EXPO_PUBLIC_API_BASE_URL을 확인해주세요.';
+  'API 서버 주소 설정이 올바르지 않습니다. VITE_API_BASE_URL을 확인해주세요.';
 const NETWORK_ERROR_MESSAGE = '서버에 연결할 수 없습니다. 네트워크 상태를 확인한 뒤 다시 시도해주세요.';
 
 type ApiRequestOptions = RequestInit & {
@@ -43,10 +43,7 @@ export class ApiError extends Error {
 }
 
 const getApiBaseUrl = () => {
-  const env =
-    process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ||
-    process.env.VITE_API_BASE_URL?.trim() ||
-    DEFAULT_API_BASE_URL;
+  const env = process.env.VITE_API_BASE_URL?.trim() || DEFAULT_API_BASE_URL;
   const normalizedUrl = env.replace(/\/$/, '').replace(/\/api$/, '');
 
   try {

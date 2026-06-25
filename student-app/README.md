@@ -51,10 +51,10 @@ student-app/
 - `GET /api/student/scores`
 - `GET /api/student/scores/:submissionId`
 
-환경변수는 Expo에서는 `EXPO_PUBLIC_API_BASE_URL`, 웹 호환 fallback으로 `VITE_API_BASE_URL`을 지원합니다.
+환경변수는 `VITE_API_BASE_URL`만 설정합니다. Student App은 Supabase를 직접 사용하지 않고 Backend API만 호출합니다.
 
 ```bash
-EXPO_PUBLIC_API_BASE_URL=https://sejongapplication-production.up.railway.app
+VITE_API_BASE_URL=https://your-backend.example.com
 ```
 
 환경변수를 지정하지 않으면 기본값으로 Railway Backend
@@ -62,13 +62,13 @@ EXPO_PUBLIC_API_BASE_URL=https://sejongapplication-production.up.railway.app
 로컬 Backend를 테스트할 때만 `.env`에 아래처럼 오버라이드합니다.
 
 ```bash
-EXPO_PUBLIC_API_BASE_URL=http://localhost:3000
 VITE_API_BASE_URL=http://localhost:3000
 ```
 
 Expo Web으로 실행하면 보통 Origin은 `http://localhost:8081`입니다.
 Vite로 실행하는 경우 Origin은 `http://localhost:5173`입니다.
 Railway Backend의 `CORS_ORIGIN`에는 실제 실행 Origin이 포함되어야 합니다.
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`는 현재 사용하지 않습니다.
 
 ## 문제집 상태
 

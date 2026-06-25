@@ -80,7 +80,7 @@ DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/
 ```
 
 `DatabaseModule`은 `DATABASE_URL`을 읽어 `pg.Pool`을 생성한다. 연결 문자열에 `supabase.co`가 포함되면 SSL 옵션을 켠다.
-현재 Backend는 PostgreSQL에 직접 연결하므로 Supabase 클라이언트용 URL과 anon key는 사용하지 않는다.
+현재 Backend는 PostgreSQL에 직접 연결하므로 Supabase 클라이언트용 `SUPABASE_URL`, `SUPABASE_ANON_KEY`는 사용하지 않는다. Frontend도 Supabase를 직접 호출하지 않고 Backend API만 호출한다.
 
 실제 `DATABASE_URL`과 `JWT_SECRET`은 로컬 `.env` 또는 배포 플랫폼의 Secret 저장소에만 보관한다.
 프론트엔드 번들, GitHub, 문서에는 실제 값을 넣지 않는다.

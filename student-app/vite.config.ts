@@ -47,7 +47,6 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
-    'process.env.EXPO_PUBLIC_API_BASE_URL': JSON.stringify(process.env.EXPO_PUBLIC_API_BASE_URL) ?? 'undefined',
     'process.env.VITE_API_BASE_URL': JSON.stringify(process.env.VITE_API_BASE_URL) ?? 'undefined',
   },
   resolve: {
