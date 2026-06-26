@@ -505,7 +505,6 @@ export class SubmissionsService {
          questions.subject,
          questions.category,
          questions.difficulty,
-         questions.explanation,
          questions.correct_answer_index
        FROM workbook_assignments
        JOIN workbook_questions
@@ -562,7 +561,6 @@ export class SubmissionsService {
          questions.subject,
          questions.category,
          questions.difficulty,
-         questions.explanation,
          submission_answers.selected_choice_id,
          submission_answers.correct_choice_id,
          selected_choices.text AS selected_choice_text,
@@ -726,7 +724,6 @@ export class SubmissionsService {
       subject: question.subject,
       category: question.category,
       difficulty: question.difficulty,
-      explanation: question.explanation,
       choices: choices.map((choice) => ({
         id: choice.id,
         text: choice.text,
@@ -780,7 +777,6 @@ export class SubmissionsService {
       subject: answer.subject,
       category: answer.category,
       difficulty: answer.difficulty,
-      explanation: answer.explanation,
       choices: choices.map((choice) => ({
         id: choice.id,
         text: choice.text,

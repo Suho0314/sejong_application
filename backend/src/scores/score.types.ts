@@ -30,7 +30,6 @@ export type ScoreAnswerRow = {
   question_id: string;
   sequence: number;
   content: string;
-  explanation: string | null;
   selected_choice_id: string | null;
   selected_choice_text: string | null;
   correct_choice_id: string | null;
@@ -77,4 +76,3 @@ export type CohortSummaryRow = AverageSummaryRow & {
 export type StudentProfileRow = {
   id: string;
 };
-

@@ -10,7 +10,6 @@ export type QuestionFormValues = {
   content: string;
   choices: string[];
   correctAnswerIndex: number;
-  explanation: string;
   status: ContentStatus;
 };
 
@@ -30,9 +29,11 @@ const emptyValues: QuestionFormValues = {
   content: '',
   choices: ['', '', '', ''],
   correctAnswerIndex: 0,
-  explanation: '',
   status: 'draft',
 };
+
+const MIN_CHOICE_COUNT = 2;
+const MAX_CHOICE_COUNT = 5;
 
 export function QuestionForm({ disabled = false, initialValues, mode, onCancel, onSubmit }: QuestionFormProps) {
   const [values, setValues] = useState<QuestionFormValues>(initialValues ?? emptyValues);
@@ -46,6 +47,37 @@ export function QuestionForm({ disabled = false, initialValues, mode, onCancel, 
       ...current,
       choices: current.choices.map((choice, choiceIndex) => (choiceIndex === index ? value : choice)),
     }));
+  };
+
+  const addChoice = () => {
+    setValues((current) => {
+      if (current.choices.length >= MAX_CHOICE_COUNT) return current;
+
+      return {
+        ...current,
+        choices: [...current.choices, ''],
+      };
+    });
+  };
+
+  const removeChoice = (index: number) => {
+    setValues((current) => {
+      if (current.choices.length <= MIN_CHOICE_COUNT) return current;
+
+      const nextChoices = current.choices.filter((_, choiceIndex) => choiceIndex !== index);
+      const nextCorrectAnswerIndex =
+        current.correctAnswerIndex === index
+          ? 0
+          : current.correctAnswerIndex > index
+            ? current.correctAnswerIndex - 1
+            : current.correctAnswerIndex;
+
+      return {
+        ...current,
+        choices: nextChoices,
+        correctAnswerIndex: Math.min(nextCorrectAnswerIndex, nextChoices.length - 1),
+      };
+    });
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -115,9 +147,28 @@ export function QuestionForm({ disabled = false, initialValues, mode, onCancel, 
               onChange={(event) => handleChoiceChange(index, event.target.value)}
               placeholder={`보기 ${index + 1}`}
             />
+            {values.choices.length > MIN_CHOICE_COUNT ? (
+              <button
+                className="text-button"
+                disabled={disabled}
+                type="button"
+                onClick={() => removeChoice(index)}
+              >
+                보기 삭제
+              </button>
+            ) : null}
           </label>
         ))}
       </div>
+
+      <button
+        className="secondary-button"
+        disabled={disabled || values.choices.length >= MAX_CHOICE_COUNT}
+        type="button"
+        onClick={addChoice}
+      >
+        보기 추가
+      </button>
 
       <label>
         <span>정답</span>
@@ -135,16 +186,6 @@ export function QuestionForm({ disabled = false, initialValues, mode, onCancel, 
             </option>
           ))}
         </select>
-      </label>
-
-      <label>
-        <span>해설</span>
-        <textarea
-          disabled={disabled}
-          value={values.explanation}
-          onChange={(event) => setValues((current) => ({ ...current, explanation: event.target.value }))}
-          placeholder="정답 해설을 입력하세요."
-        />
       </label>
 
       <label>

@@ -20,7 +20,6 @@ type QuestionRow = {
   content: string;
   choices: string[];
   correctAnswerIndex: number;
-  explanation?: string;
   status: ContentStatus;
   createdAt: string;
   updatedAt: string;
@@ -80,7 +79,6 @@ const toQuestionRow = (question: QuestionApiItem): QuestionRow => ({
   content: question.content,
   choices: question.choices.map((choice) => choice.text),
   correctAnswerIndex: question.correctAnswerIndex,
-  explanation: question.explanation ?? '',
   status: question.status,
   createdAt: question.createdAt,
   updatedAt: question.updatedAt,

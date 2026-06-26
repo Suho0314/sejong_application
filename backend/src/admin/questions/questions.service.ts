@@ -137,10 +137,9 @@ export class QuestionsService {
            type,
            content,
            correct_answer_index,
-           explanation,
            status
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING
            id,
            created_by,
@@ -150,7 +149,6 @@ export class QuestionsService {
            type,
            content,
            correct_answer_index,
-           explanation,
            status,
            created_at,
            updated_at`,
@@ -162,7 +160,6 @@ export class QuestionsService {
           questionType,
           content,
           answerIndex,
-          body.explanation ?? null,
           body.status ?? 'draft',
         ],
       );
@@ -202,8 +199,7 @@ export class QuestionsService {
            type = COALESCE($5, type),
            content = COALESCE($6, content),
            correct_answer_index = COALESCE($7, correct_answer_index),
-           explanation = $8,
-           status = COALESCE($9, status),
+           status = COALESCE($8, status),
            updated_at = now()
          WHERE id = $1
            AND deleted_at IS NULL
@@ -216,7 +212,6 @@ export class QuestionsService {
            type,
            content,
            correct_answer_index,
-           explanation,
            status,
            created_at,
            updated_at`,
@@ -228,7 +223,6 @@ export class QuestionsService {
           body.type ?? body.questionType ?? null,
           this.optionalContent(body.content, body.stem),
           body.correctAnswerIndex ?? body.answerKey ?? null,
-          body.explanation === undefined ? current.explanation : body.explanation,
           body.status ?? null,
         ],
       );
@@ -281,7 +275,6 @@ export class QuestionsService {
       questions.type,
       questions.content,
       questions.correct_answer_index,
-      questions.explanation,
       questions.status,
       questions.created_at,
       questions.updated_at
@@ -407,7 +400,6 @@ export class QuestionsService {
       })),
       correctAnswerIndex: row.correct_answer_index,
       answerKey: row.correct_answer_index,
-      explanation: row.explanation,
       status: row.status,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),

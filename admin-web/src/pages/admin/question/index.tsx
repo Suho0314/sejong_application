@@ -26,7 +26,6 @@ const toRow = (question: QuestionApiItem): QuestionRow => ({
   content: question.content,
   choices: question.choices.map((choice) => choice.text),
   correctAnswerIndex: question.correctAnswerIndex,
-  explanation: question.explanation ?? '',
   status: question.status,
   createdAt: question.createdAt,
   updatedAt: question.updatedAt,
@@ -41,7 +40,6 @@ const toFormValues = (question: QuestionRow): QuestionFormValues => ({
   content: question.content,
   choices: question.choices,
   correctAnswerIndex: question.correctAnswerIndex,
-  explanation: question.explanation ?? '',
   status: question.status,
 });
 
@@ -53,7 +51,6 @@ const toPayload = (values: QuestionFormValues): QuestionPayload => ({
   content: values.content.trim(),
   choices: values.choices.map((choice) => choice.trim()),
   correctAnswerIndex: values.correctAnswerIndex,
-  explanation: values.explanation.trim() || null,
   status: values.status,
 });
 
@@ -327,7 +324,7 @@ export function QuestionPage() {
           <div className="panel-header">
             <div>
               <h2>{isCreating ? '문제 추가' : '문제 수정'}</h2>
-              <p>객관식 4지선다 문제를 관리합니다. 저장 시 DB에 반영됩니다.</p>
+              <p>객관식 문제는 보기 2~5개까지 관리할 수 있습니다. 저장 시 DB에 반영됩니다.</p>
             </div>
           </div>
           <QuestionForm

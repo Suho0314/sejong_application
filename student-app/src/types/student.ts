@@ -66,7 +66,6 @@ export type GradedAnswer = {
   correctChoiceId: string;
   correctChoiceText: string;
   isCorrect: boolean;
-  explanation?: string | null;
 };
 
 export type SubmissionResult = {

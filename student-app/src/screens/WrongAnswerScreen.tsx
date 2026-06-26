@@ -86,7 +86,6 @@ export function WrongAnswerScreen({ cohortId, submissions }: WrongAnswerScreenPr
                         key={answer.questionId}
                         answer={answer}
                         index={index}
-                        showExplanation
                       />
                     ))}
                   </View>

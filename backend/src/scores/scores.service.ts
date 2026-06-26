@@ -321,7 +321,6 @@ export class ScoresService {
          submission_answers.question_id,
          workbook_questions.sequence,
          questions.content,
-         questions.explanation,
          submission_answers.selected_choice_id,
          selected_choices.text AS selected_choice_text,
          submission_answers.correct_choice_id,
@@ -529,7 +528,6 @@ export class ScoresService {
       correctAnswer: answer.correct_choice_text,
       isCorrect: answer.is_correct,
       earnedPoints: answer.earned_points,
-      explanation: answer.explanation,
       gradedAt: answer.graded_at?.toISOString() ?? null,
     };
   }

@@ -11,7 +11,6 @@ export type SubmissionAnswerApiItem = {
   subject: string;
   category: string | null;
   difficulty: Difficulty;
-  explanation: string | null;
   choices: Array<{
     id: string;
     text: string;

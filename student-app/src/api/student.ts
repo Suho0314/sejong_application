@@ -11,7 +11,6 @@ export type StudentAssignmentQuestionApiItem = {
   subject: string;
   category: string | null;
   difficulty: 'easy' | 'medium' | 'hard';
-  explanation: string | null;
   choices: Array<{
     id: string;
     text: string;
@@ -49,7 +48,6 @@ export type SubmissionAnswerApiItem = {
   subject: string;
   category: string | null;
   difficulty: 'easy' | 'medium' | 'hard';
-  explanation: string | null;
   choices: Array<{
     id: string;
     text: string;
@@ -79,7 +77,6 @@ export type StudentScoreAnswerApiItem = {
   correctAnswer: string | null;
   isCorrect: boolean;
   earnedPoints: number;
-  explanation: string | null;
   gradedAt: string | null;
 };
 

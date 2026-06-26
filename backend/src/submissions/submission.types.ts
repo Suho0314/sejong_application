@@ -35,7 +35,6 @@ export type AssignmentQuestionRow = {
   subject: string;
   category: string | null;
   difficulty: 'easy' | 'medium' | 'hard';
-  explanation: string | null;
   correct_answer_index: number;
 };
 
@@ -83,7 +82,6 @@ export type SubmissionAnswerRow = {
   subject: string;
   category: string | null;
   difficulty: 'easy' | 'medium' | 'hard';
-  explanation: string | null;
   selected_choice_id: string | null;
   correct_choice_id: string | null;
   selected_choice_text: string | null;
@@ -101,4 +99,3 @@ export type GradedAnswerInput = {
   isCorrect: boolean;
   earnedPoints: number;
 };
-

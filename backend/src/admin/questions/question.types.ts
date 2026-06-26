@@ -16,7 +16,6 @@ export type QuestionRow = {
   type: QuestionType;
   content: string;
   correct_answer_index: number;
-  explanation: string | null;
   status: QuestionStatus;
   created_at: Date;
   updated_at: Date;
@@ -40,7 +39,6 @@ export type QuestionResponse = {
   choices: QuestionChoice[];
   correctAnswerIndex: number;
   answerKey: number;
-  explanation: string | null;
   status: QuestionStatus;
   createdAt: string;
   updatedAt: string;

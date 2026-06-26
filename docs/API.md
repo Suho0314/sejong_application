@@ -837,9 +837,8 @@ Response:
 | `difficulty` | `easy \| medium \| hard` | 난이도 |
 | `type` | `multiple_choice` | 문제 유형 |
 | `content` | string | 문제 본문 |
-| `choices` | Choice[] | 객관식 선지. 각 선지는 `id`, `text`를 가진다. |
+| `choices` | Choice[] | 객관식 선지. 각 선지는 `id`, `text`를 가진다. 2개 이상, 최대 5개까지 지원한다. |
 | `correctAnswerIndex` | integer | 정답 선지의 0부터 시작하는 배열 인덱스. 학생 풀이 전 응답에서는 제외한다. |
-| `explanation` | string \| null | 해설. 현재 학생 앱 응답에서는 제외한다. |
 | `status` | `draft \| published \| archived` | 콘텐츠 상태 |
 | `createdAt` | ISO 8601 datetime | 생성 일시 |
 | `updatedAt` | ISO 8601 datetime | 수정 일시 |
@@ -874,7 +873,6 @@ Response:
         { "id": "choice-2", "text": "키" }
       ],
       "correctAnswerIndex": 0,
-      "explanation": "혈압은 활력징후에 포함된다.",
       "status": "published",
       "createdAt": "2026-06-18T09:00:00+09:00",
       "updatedAt": "2026-06-18T09:00:00+09:00"
@@ -909,10 +907,10 @@ Request:
     { "id": "choice-1", "text": "혈압" },
     { "id": "choice-2", "text": "키" },
     { "id": "choice-3", "text": "몸무게" },
-    { "id": "choice-4", "text": "시력" }
+    { "id": "choice-4", "text": "시력" },
+    { "id": "choice-5", "text": "청력" }
   ],
   "correctAnswerIndex": 0,
-  "explanation": "혈압은 활력징후에 포함된다.",
   "status": "draft"
 }
 ```
@@ -933,10 +931,10 @@ Response:
       { "id": "choice-1", "text": "혈압" },
       { "id": "choice-2", "text": "키" },
       { "id": "choice-3", "text": "몸무게" },
-      { "id": "choice-4", "text": "시력" }
+      { "id": "choice-4", "text": "시력" },
+      { "id": "choice-5", "text": "청력" }
     ],
     "correctAnswerIndex": 0,
-    "explanation": "혈압은 활력징후에 포함된다.",
     "status": "draft",
     "createdAt": "2026-06-18T09:00:00+09:00",
     "updatedAt": "2026-06-18T09:00:00+09:00"
@@ -970,7 +968,6 @@ Response:
       { "id": "choice-1", "text": "혈압" }
     ],
     "correctAnswerIndex": 0,
-    "explanation": "혈압은 활력징후에 포함된다.",
     "status": "published",
     "createdAt": "2026-06-18T09:00:00+09:00",
     "updatedAt": "2026-06-18T09:00:00+09:00"
@@ -992,7 +989,14 @@ Request:
 {
   "content": "다음 중 활력징후에 포함되는 것은?",
   "difficulty": "hard",
-  "explanation": "혈압, 맥박, 호흡, 체온 등이 활력징후다."
+  "choices": [
+    { "text": "혈압" },
+    { "text": "키" },
+    { "text": "몸무게" },
+    { "text": "시력" },
+    { "text": "청력" }
+  ],
+  "correctAnswerIndex": 0
 }
 ```
 
@@ -1004,7 +1008,7 @@ Response:
     "id": "question-uuid",
     "content": "다음 중 활력징후에 포함되는 것은?",
     "difficulty": "hard",
-    "explanation": "혈압, 맥박, 호흡, 체온 등이 활력징후다.",
+    "correctAnswerIndex": 0,
     "updatedAt": "2026-06-18T10:00:00+09:00"
   }
 }
@@ -2067,8 +2071,7 @@ Response:
         "selectedChoiceId": "choice-1",
         "correctChoiceId": "choice-1",
         "isCorrect": true,
-        "earnedPoints": 5,
-        "explanation": "혈압은 활력징후에 포함된다."
+        "earnedPoints": 5
       }
     ]
   }

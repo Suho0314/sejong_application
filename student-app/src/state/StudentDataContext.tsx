@@ -76,7 +76,6 @@ const toResult = (submission: ResultSource): SubmissionResult => {
     correctChoiceId: answer.correctChoiceId ?? '',
     correctChoiceText: ('correctChoiceText' in answer ? answer.correctChoiceText : answer.correctAnswer) ?? '-',
     isCorrect: answer.isCorrect,
-    explanation: answer.explanation,
   }));
 
   return {

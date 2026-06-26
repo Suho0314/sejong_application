@@ -1,5 +1,6 @@
 import {
   ArrayMinSize,
+  ArrayMaxSize,
   IsArray,
   IsIn,
   IsInt,
@@ -49,6 +50,7 @@ export class UpdateQuestionDto {
   @IsOptional()
   @IsArray()
   @ArrayMinSize(2)
+  @ArrayMaxSize(5)
   choices?: Array<QuestionChoiceDto | string>;
 
   @IsOptional()
@@ -60,10 +62,6 @@ export class UpdateQuestionDto {
   @IsInt()
   @Min(0)
   answerKey?: number;
-
-  @IsOptional()
-  @IsString()
-  explanation?: string | null;
 
   @IsOptional()
   @IsIn(STATUSES)

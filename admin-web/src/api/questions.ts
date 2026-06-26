@@ -17,7 +17,6 @@ export type QuestionApiItem = {
   choices: QuestionChoiceApiItem[];
   correctAnswerIndex: number;
   answerKey: number;
-  explanation: string | null;
   status: ContentStatus;
   createdAt: string;
   updatedAt: string;
@@ -42,7 +41,6 @@ export type QuestionPayload = {
   content: string;
   choices: string[];
   correctAnswerIndex: number;
-  explanation?: string | null;
   status: ContentStatus;
 };
 

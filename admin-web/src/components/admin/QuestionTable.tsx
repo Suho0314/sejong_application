@@ -11,7 +11,6 @@ export type QuestionRow = {
   content: string;
   choices: string[];
   correctAnswerIndex: number;
-  explanation?: string;
   status: ContentStatus;
   createdAt: string;
   updatedAt: string;
