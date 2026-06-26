@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { getAdminSession, logoutAdmin } from '../../lib/auth';
+import { logoutAdmin } from '../../lib/auth';
 
 const menuItems = [
   { label: 'Dashboard', to: '/admin/dashboard' },
@@ -14,7 +14,6 @@ const menuItems = [
 
 export function AdminLayout() {
   const navigate = useNavigate();
-  const session = getAdminSession();
 
   const handleLogout = () => {
     logoutAdmin();
@@ -25,7 +24,6 @@ export function AdminLayout() {
     <div className="admin-layout">
       <aside>
         <strong>Sejong Admin</strong>
-        {session ? <span className="today-label">{session.name}</span> : null}
         <nav>
           {menuItems.map((item) => (
             <NavLink key={item.to} to={item.to}>
