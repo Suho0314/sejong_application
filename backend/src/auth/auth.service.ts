@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
@@ -21,6 +22,14 @@ const INVALID_CREDENTIALS_RESPONSE = {
   error: {
     code: 'INVALID_CREDENTIALS',
     message: '로그인 정보가 올바르지 않습니다.',
+    details: [],
+  },
+};
+
+const INVALID_KAKAO_REDIRECT_URI_RESPONSE = {
+  error: {
+    code: 'KAKAO_REDIRECT_URI_NOT_ALLOWED',
+    message: '허용되지 않은 카카오 Redirect URI입니다.',
     details: [],
   },
 };
@@ -86,13 +95,17 @@ export class AuthService {
     };
   }
 
-  getKakaoAuthorizeUrl(redirectUri: string) {
+  getKakaoAuthorizeUrl(redirectUri: string, state: string) {
+    this.assertAllowedKakaoRedirectUri(redirectUri);
+    this.assertValidOAuthState(state);
+
     const clientId = this.getKakaoClientId();
     const authorizationUrl = new URL('https://kauth.kakao.com/oauth/authorize');
 
     authorizationUrl.searchParams.set('client_id', clientId);
     authorizationUrl.searchParams.set('redirect_uri', redirectUri);
     authorizationUrl.searchParams.set('response_type', 'code');
+    authorizationUrl.searchParams.set('state', state);
 
     return {
       data: {
@@ -101,7 +114,10 @@ export class AuthService {
     };
   }
 
-  async loginStudentWithKakao(code: string, redirectUri: string) {
+  async loginStudentWithKakao(code: string, redirectUri: string, state: string) {
+    this.assertAllowedKakaoRedirectUri(redirectUri);
+    this.assertValidOAuthState(state);
+
     const kakaoAccessToken = await this.exchangeKakaoCode(code, redirectUri);
     const kakaoUser = await this.getKakaoUserInfo(kakaoAccessToken);
     const student = await this.findOrCreateKakaoStudent(kakaoUser);
@@ -333,6 +349,46 @@ export class AuthService {
     }
 
     return clientId;
+  }
+
+  private assertAllowedKakaoRedirectUri(redirectUri: string): void {
+    const allowedRedirectUris = this.getKakaoAllowedRedirectUris();
+
+    if (!allowedRedirectUris.includes(redirectUri)) {
+      throw new BadRequestException(INVALID_KAKAO_REDIRECT_URI_RESPONSE);
+    }
+  }
+
+  private assertValidOAuthState(state: string): void {
+    if (!state?.trim()) {
+      throw new BadRequestException({
+        error: {
+          code: 'KAKAO_OAUTH_STATE_REQUIRED',
+          message: '카카오 로그인 state 값이 필요합니다.',
+          details: [],
+        },
+      });
+    }
+  }
+
+  private getKakaoAllowedRedirectUris(): string[] {
+    const configuredValue = this.configService.get<string>('KAKAO_ALLOWED_REDIRECT_URIS');
+    const allowedRedirectUris = configuredValue
+      ?.split(',')
+      .map((value) => value.trim())
+      .filter(Boolean) ?? [];
+
+    if (allowedRedirectUris.length === 0) {
+      throw new InternalServerErrorException({
+        error: {
+          code: 'KAKAO_REDIRECT_URI_ALLOWLIST_MISSING',
+          message: '카카오 Redirect URI 허용 목록이 설정되지 않았습니다.',
+          details: [],
+        },
+      });
+    }
+
+    return allowedRedirectUris;
   }
 
   private async findUser(identifier: string, role: LoginRole): Promise<LoginUserRow | null> {

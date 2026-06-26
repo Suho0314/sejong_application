@@ -147,14 +147,20 @@ Response:
 | URL | `/api/auth/student/kakao/authorize` |
 | StatusCode | `200`, `400`, `500` |
 
-Query parameters: `redirectUri`
+Query parameters: `redirectUri`, `state`
+
+정책:
+
+- `redirectUri`는 Backend 환경변수 `KAKAO_ALLOWED_REDIRECT_URIS`의 쉼표 구분 목록과 정확히 일치해야 한다.
+- 와일드카드, prefix 비교, 임의 하위 도메인 허용은 사용하지 않는다.
+- `state`는 클라이언트가 로그인 시도별로 생성한 예측 불가능한 문자열이며, 카카오 인가 URL에 그대로 포함된다.
 
 Response:
 
 ```json
 {
   "data": {
-    "authorizationUrl": "https://kauth.kakao.com/oauth/authorize?..."
+    "authorizationUrl": "https://kauth.kakao.com/oauth/authorize?...&state=oauth-state"
   }
 }
 ```
@@ -174,9 +180,16 @@ Request:
 ```json
 {
   "code": "kakao-authorization-code",
-  "redirectUri": "https://student-app.example.com"
+  "redirectUri": "https://student-app.example.com",
+  "state": "oauth-state"
 }
 ```
+
+정책:
+
+- callback 요청의 `redirectUri`도 `KAKAO_ALLOWED_REDIRECT_URIS`와 정확히 일치해야 한다.
+- Student App은 저장해둔 state와 callback state가 일치할 때만 이 API를 호출한다.
+- state 누락 또는 불일치 시 Student App은 Backend callback API를 호출하지 않는다.
 
 Pending / rejected / suspended Response:
 

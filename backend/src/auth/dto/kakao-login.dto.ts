@@ -1,9 +1,13 @@
-import { IsString, IsUrl, MaxLength } from 'class-validator';
+import { IsString, MaxLength } from 'class-validator';
 
 export class KakaoAuthorizeQueryDto {
-  @IsUrl({ require_tld: false })
+  @IsString()
   @MaxLength(500)
   redirectUri!: string;
+
+  @IsString()
+  @MaxLength(200)
+  state!: string;
 }
 
 export class KakaoCallbackDto {
@@ -11,7 +15,11 @@ export class KakaoCallbackDto {
   @MaxLength(500)
   code!: string;
 
-  @IsUrl({ require_tld: false })
+  @IsString()
   @MaxLength(500)
   redirectUri!: string;
+
+  @IsString()
+  @MaxLength(200)
+  state!: string;
 }

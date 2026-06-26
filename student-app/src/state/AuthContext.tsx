@@ -17,8 +17,8 @@ type AuthContextValue = {
   approval: StudentApproval | null;
   expiredMessage: string;
   isAuthenticated: boolean;
-  getKakaoLoginUrl: (redirectUri: string) => Promise<string>;
-  completeKakaoLogin: (code: string, redirectUri: string) => Promise<StudentUser | StudentApproval>;
+  getKakaoLoginUrl: (redirectUri: string, state: string) => Promise<string>;
+  completeKakaoLogin: (code: string, redirectUri: string, state: string) => Promise<StudentUser | StudentApproval>;
   logout: (message?: string) => void;
 };
 
@@ -36,8 +36,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     expiredMessage,
     isAuthenticated,
     getKakaoLoginUrl: getKakaoAuthorizationUrl,
-    completeKakaoLogin: async (code, redirectUri) => {
-      const result = await loginStudentWithKakaoCode(code, redirectUri);
+    completeKakaoLogin: async (code, redirectUri, state) => {
+      const result = await loginStudentWithKakaoCode(code, redirectUri, state);
 
       if ('role' in result) {
         setUser(result);

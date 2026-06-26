@@ -97,6 +97,7 @@ Add these values directly in Railway Variables. Do not commit real Kakao keys.
 
 - `KAKAO_REST_API_KEY`: Kakao Developers REST API key.
 - `KAKAO_CLIENT_SECRET`: optional Kakao client secret if enabled in Kakao Developers.
+- `KAKAO_ALLOWED_REDIRECT_URIS`: comma-separated exact redirect URIs allowed by the backend.
 
 Register redirect URIs in Kakao Developers for each runtime:
 
@@ -108,3 +109,10 @@ Register redirect URIs in Kakao Developers for each runtime:
 Set this Student App environment variable only when a fixed redirect URI is needed:
 
 - `EXPO_PUBLIC_KAKAO_REDIRECT_URI`
+
+OAuth safety rules:
+
+- Keep `KAKAO_ALLOWED_REDIRECT_URIS` in sync with Kakao Developers redirect URIs.
+- Use exact URI values only. Do not use wildcards, prefix matching, or arbitrary subdomain patterns.
+- The Student App creates an OAuth `state` value per login attempt and verifies it before calling the backend callback API.
+- Do not log Kakao authorization codes, access tokens, refresh tokens, client secrets, or raw state values.

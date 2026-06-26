@@ -16,12 +16,12 @@ export class AuthController {
   @Get('student/kakao/authorize')
   @HttpCode(HttpStatus.OK)
   getKakaoAuthorizeUrl(@Query() query: KakaoAuthorizeQueryDto) {
-    return this.authService.getKakaoAuthorizeUrl(query.redirectUri);
+    return this.authService.getKakaoAuthorizeUrl(query.redirectUri, query.state);
   }
 
   @Post('student/kakao/callback')
   @HttpCode(HttpStatus.OK)
   loginStudentWithKakao(@Body() body: KakaoCallbackDto) {
-    return this.authService.loginStudentWithKakao(body.code, body.redirectUri);
+    return this.authService.loginStudentWithKakao(body.code, body.redirectUri, body.state);
   }
 }

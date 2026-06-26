@@ -8,10 +8,55 @@ import { useAuth } from '../state/AuthContext';
 import type { ScreenProps } from '../types/navigation';
 
 const KAKAO_CALLBACK_SCHEME = 'nursing-student-app://kakao/oauth';
+const KAKAO_OAUTH_STATE_STORAGE_KEY = 'sejong_kakao_oauth_state';
+let nativeOAuthState: string | null = null;
 
 const getWebLocation = () => {
   if (typeof globalThis === 'undefined' || !('location' in globalThis)) return null;
   return (globalThis as typeof globalThis & { location: Location }).location;
+};
+
+const getSessionStorage = () => {
+  if (typeof globalThis === 'undefined' || !('sessionStorage' in globalThis)) return null;
+  return (globalThis as typeof globalThis & { sessionStorage: Storage }).sessionStorage;
+};
+
+const generateOAuthState = () => {
+  const bytes = new Uint8Array(32);
+  const cryptoObject = (globalThis as typeof globalThis & { crypto?: Crypto }).crypto;
+
+  if (!cryptoObject?.getRandomValues) {
+    throw new Error('보안 로그인을 위한 난수 생성 기능을 사용할 수 없습니다.');
+  }
+
+  cryptoObject.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+};
+
+const saveOAuthState = (state: string) => {
+  const sessionStorage = getSessionStorage();
+
+  if (Platform.OS === 'web' && sessionStorage) {
+    sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, state);
+    return;
+  }
+
+  nativeOAuthState = state;
+};
+
+const getStoredOAuthState = () => {
+  const sessionStorage = getSessionStorage();
+
+  if (Platform.OS === 'web' && sessionStorage) {
+    return sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+  }
+
+  return nativeOAuthState;
+};
+
+const clearOAuthState = () => {
+  getSessionStorage()?.removeItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+  nativeOAuthState = null;
 };
 
 const getRedirectUri = () => {
@@ -35,6 +80,15 @@ const extractCodeFromUrl = (url: string) => {
   }
 };
 
+const extractStateFromUrl = (url: string) => {
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.searchParams.get('state');
+  } catch {
+    return null;
+  }
+};
+
 const clearWebKakaoQuery = () => {
   if (Platform.OS !== 'web') return;
   const history = (globalThis as typeof globalThis & { history?: History }).history;
@@ -50,6 +104,10 @@ const getLoginErrorMessage = (error: unknown) => {
     return error.message;
   }
 
+  if (error instanceof Error) {
+    return error.message;
+  }
+
   return '카카오 로그인 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
 };
 
@@ -61,14 +119,30 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
 
   const handleKakaoCallbackUrl = useCallback(async (url: string) => {
     const code = extractCodeFromUrl(url);
+    const callbackState = extractStateFromUrl(url);
     if (!code || isLoading) return;
 
     setIsLoading(true);
     setErrorMessage('');
 
     try {
-      const result = await completeKakaoLogin(code, redirectUri);
+      const storedState = getStoredOAuthState();
+
+      if (!callbackState) {
+        throw new Error('카카오 로그인 state 값이 없어 로그인을 완료할 수 없습니다. 다시 시도해주세요.');
+      }
+
+      if (!storedState) {
+        throw new Error('만료된 카카오 로그인 요청입니다. 다시 로그인해주세요.');
+      }
+
+      if (callbackState !== storedState) {
+        throw new Error('카카오 로그인 요청이 일치하지 않습니다. 다시 로그인해주세요.');
+      }
+
+      const result = await completeKakaoLogin(code, redirectUri, callbackState);
       clearWebKakaoQuery();
+      clearOAuthState();
 
       if ('role' in result) {
         navigation.replace('CohortSelect');
@@ -76,6 +150,8 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
         navigation.replace('ApprovalStatus');
       }
     } catch (error) {
+      clearOAuthState();
+      clearWebKakaoQuery();
       setErrorMessage(getLoginErrorMessage(error));
     } finally {
       setIsLoading(false);
@@ -118,7 +194,10 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
     setErrorMessage('');
 
     try {
-      const authorizationUrl = await getKakaoLoginUrl(redirectUri);
+      const state = generateOAuthState();
+      saveOAuthState(state);
+
+      const authorizationUrl = await getKakaoLoginUrl(redirectUri, state);
 
       if (Platform.OS === 'web') {
         const webLocation = getWebLocation();
@@ -130,6 +209,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
 
       await Linking.openURL(authorizationUrl);
     } catch (error) {
+      clearOAuthState();
       setErrorMessage(getLoginErrorMessage(error));
       setIsLoading(false);
     }

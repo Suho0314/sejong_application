@@ -76,20 +76,20 @@ export const clearStudentApproval = () => {
   appStorage.removeItem(STUDENT_APPROVAL_STORAGE_KEY);
 };
 
-export const getKakaoAuthorizationUrl = async (redirectUri: string) => {
+export const getKakaoAuthorizationUrl = async (redirectUri: string, state: string) => {
   const response = await apiRequest<KakaoAuthorizeResponse>(
-    `/auth/student/kakao/authorize?redirectUri=${encodeURIComponent(redirectUri)}`,
+    `/auth/student/kakao/authorize?redirectUri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`,
     { auth: false },
   );
 
   return response.data.authorizationUrl;
 };
 
-export const loginStudentWithKakaoCode = async (code: string, redirectUri: string) => {
+export const loginStudentWithKakaoCode = async (code: string, redirectUri: string, state: string) => {
   const response = await apiRequest<KakaoLoginResponse>('/auth/student/kakao/callback', {
     auth: false,
     method: 'POST',
-    body: JSON.stringify({ code, redirectUri }),
+    body: JSON.stringify({ code, redirectUri, state }),
   });
 
   if (response.data.status !== 'approved') {
