@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { dashboardApi, type DashboardData } from '../../../api/dashboard';
 
 const formatDateTime = (value: string | null) => {
@@ -32,7 +32,6 @@ export function DashboardPage() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const hasRequestedDashboard = useRef(false);
 
   const loadDashboard = useCallback(async () => {
     setIsLoading(true);
@@ -50,9 +49,6 @@ export function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (hasRequestedDashboard.current) return;
-
-    hasRequestedDashboard.current = true;
     void loadDashboard();
   }, [loadDashboard]);
 

@@ -18,6 +18,13 @@ export class DashboardService {
           (
             SELECT COUNT(*)
             FROM students
+            JOIN users
+              ON users.id = students.user_id
+            LEFT JOIN cohorts
+              ON cohorts.id = students.cohort_id
+            WHERE students.deleted_at IS NULL
+              AND users.deleted_at IS NULL
+              AND (students.cohort_id IS NULL OR cohorts.deleted_at IS NULL)
           ) AS total_students,
           (
             SELECT COUNT(*)
