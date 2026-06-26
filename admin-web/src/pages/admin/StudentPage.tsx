@@ -15,22 +15,26 @@ type CohortOption = {
 
 type StatusFilter = 'all' | StudentStatus;
 
-const toRow = (student: StudentApiItem): StudentRow => ({
-  id: student.id,
-  userId: student.userId,
-  cohortId: student.cohortId,
-  name: student.name,
-  email: student.email ?? '',
-  phone: student.phone ?? '',
-  birthDate: undefined,
-  studentNo: student.studentNo ?? '',
-  status: student.status,
-  enrolledAt: student.enrolledOn,
-  enrolledOn: student.enrolledOn ?? '',
-  createdAt: student.createdAt,
-  updatedAt: student.updatedAt,
-  deletedAt: null,
-});
+const toRow = (student: StudentApiItem): StudentRow => {
+  const displayEnrolledOn = student.enrolledOn ?? student.createdAt;
+
+  return {
+    id: student.id,
+    userId: student.userId,
+    cohortId: student.cohortId,
+    name: student.name,
+    email: student.email ?? '',
+    phone: student.phone ?? '',
+    birthDate: undefined,
+    studentNo: student.studentNo ?? '',
+    status: student.status,
+    enrolledAt: displayEnrolledOn,
+    enrolledOn: displayEnrolledOn,
+    createdAt: student.createdAt,
+    updatedAt: student.updatedAt,
+    deletedAt: null,
+  };
+};
 
 const toFormValues = (student: StudentRow): StudentFormValues => ({
   name: student.name,

@@ -34,6 +34,16 @@ const INVALID_KAKAO_REDIRECT_URI_RESPONSE = {
   },
 };
 
+const KAKAO_STUDENT_FALLBACK_NAME = '카카오 학생';
+const KAKAO_STUDENT_PROFILE_SCOPES = ['profile_nickname', 'account_email'];
+
+const normalizeOptionalString = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+
+  const trimmedValue = value.trim();
+  return trimmedValue.length > 0 ? trimmedValue : null;
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -106,6 +116,7 @@ export class AuthService {
     authorizationUrl.searchParams.set('redirect_uri', redirectUri);
     authorizationUrl.searchParams.set('response_type', 'code');
     authorizationUrl.searchParams.set('state', state);
+    authorizationUrl.searchParams.set('scope', KAKAO_STUDENT_PROFILE_SCOPES.join(','));
 
     return {
       data: {
@@ -205,6 +216,7 @@ export class AuthService {
       properties?: { nickname?: string };
       kakao_account?: {
         email?: string;
+        name?: string;
         profile?: { nickname?: string };
       };
     } | null;
@@ -221,14 +233,17 @@ export class AuthService {
 
     return {
       providerUserId: String(body.id),
-      nickname: body.kakao_account?.profile?.nickname ?? body.properties?.nickname ?? null,
-      email: body.kakao_account?.email ?? null,
+      nickname:
+        normalizeOptionalString(body.kakao_account?.profile?.nickname) ??
+        normalizeOptionalString(body.properties?.nickname) ??
+        normalizeOptionalString(body.kakao_account?.name),
+      email: normalizeOptionalString(body.kakao_account?.email),
     };
   }
 
   private async findOrCreateKakaoStudent(kakaoUser: KakaoUserInfo): Promise<KakaoStudentRow> {
     const existing = await this.findKakaoStudent(kakaoUser.providerUserId);
-    if (existing) return existing;
+    if (existing) return this.updateKakaoStudentProfileIfNeeded(existing, kakaoUser);
 
     const pool = this.databaseService.getPool();
     const client = await pool.connect();
@@ -236,7 +251,7 @@ export class AuthService {
     try {
       await client.query('BEGIN');
 
-      const name = kakaoUser.nickname?.trim() || '카카오 학생';
+      const name = kakaoUser.nickname ?? KAKAO_STUDENT_FALLBACK_NAME;
       const loginId = `kakao:${kakaoUser.providerUserId}`;
       const userResult = await client.query<{ id: string }>(
         `INSERT INTO users (
@@ -292,6 +307,35 @@ export class AuthService {
     } finally {
       client.release();
     }
+  }
+
+  private async updateKakaoStudentProfileIfNeeded(
+    student: KakaoStudentRow,
+    kakaoUser: KakaoUserInfo,
+  ): Promise<KakaoStudentRow> {
+    const nextName =
+      student.name === KAKAO_STUDENT_FALLBACK_NAME && kakaoUser.nickname
+        ? kakaoUser.nickname
+        : null;
+    const nextEmail = !student.email && kakaoUser.email ? kakaoUser.email : null;
+
+    if (!nextName && !nextEmail) {
+      return student;
+    }
+
+    await this.databaseService.getPool().query(
+      `UPDATE users
+       SET name = COALESCE($2, name),
+           email = COALESCE($3, email),
+           updated_at = now()
+       WHERE id = $1
+         AND role = 'student'
+         AND auth_provider = 'kakao'
+         AND deleted_at IS NULL`,
+      [student.user_id, nextName, nextEmail],
+    );
+
+    return (await this.findKakaoStudent(kakaoUser.providerUserId)) ?? student;
   }
 
   private async findKakaoStudent(providerUserId: string): Promise<KakaoStudentRow | null> {
