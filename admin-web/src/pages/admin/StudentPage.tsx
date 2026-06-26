@@ -9,11 +9,16 @@ import { StudentStatus } from '../../types/domain';
 const PAGE_SIZE = 5;
 
 type CohortOption = {
-  id: string;
-  name: string;
+  cohortId: string;
+  cohortName: string;
 };
 
 type StatusFilter = 'all' | StudentStatus;
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuid = (value: string | null | undefined): value is string =>
+  typeof value === 'string' && UUID_PATTERN.test(value);
 
 const toRow = (student: StudentApiItem): StudentRow => {
   const displayEnrolledOn = student.enrolledOn ?? student.createdAt;
@@ -76,6 +81,10 @@ export function StudentPage() {
 
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
+  const studentFormCohorts = cohorts.map((cohort) => ({
+    id: cohort.cohortId,
+    name: cohort.cohortName,
+  }));
 
   const loadCohorts = useCallback(async () => {
     const response = await cohortApi.list({
@@ -83,7 +92,7 @@ export function StudentPage() {
       limit: 100,
     });
 
-    setCohorts(response.data.map((cohort) => ({ id: cohort.id, name: cohort.name })));
+    setCohorts(response.data.map((cohort) => ({ cohortId: cohort.id, cohortName: cohort.name })));
   }, []);
 
   const loadStudents = useCallback(async (nextPage = page) => {
@@ -164,16 +173,26 @@ export function StudentPage() {
   };
 
   const handleApprovalCohortChange = (studentId: string, nextCohortId: string) => {
+    const selectedCohort = cohorts.find((cohort) => cohort.cohortId === nextCohortId);
+
+    if (!selectedCohort || !isUuid(selectedCohort.cohortId)) {
+      setErrorMessage('승인할 기수 ID가 올바르지 않습니다. 기수 목록을 다시 불러와주세요.');
+      return;
+    }
+
     setApprovalCohortIds((current) => ({
       ...current,
-      [studentId]: nextCohortId,
+      [studentId]: selectedCohort.cohortId,
     }));
   };
 
   const handleApprove = async (studentId: string) => {
-    const cohortIdToApprove = approvalCohortIds[studentId] ?? cohorts[0]?.id;
+    const selectedCohort =
+      cohorts.find((cohort) => cohort.cohortId === approvalCohortIds[studentId]) ??
+      cohorts.find((cohort) => isUuid(cohort.cohortId));
+    const cohortIdToApprove = selectedCohort?.cohortId;
 
-    if (!cohortIdToApprove) {
+    if (!isUuid(cohortIdToApprove)) {
       setErrorMessage('승인할 기수를 먼저 선택해주세요.');
       return;
     }
@@ -273,8 +292,8 @@ export function StudentPage() {
             <select value={cohortId} onChange={(event) => handleCohortChange(event.target.value)}>
               <option value="all">전체 기수</option>
               {cohorts.map((cohort) => (
-                <option key={cohort.id} value={cohort.id}>
-                  {cohort.name}
+                <option key={cohort.cohortId} value={cohort.cohortId}>
+                  {cohort.cohortName}
                 </option>
               ))}
             </select>
@@ -325,7 +344,7 @@ export function StudentPage() {
             </div>
           </div>
           <StudentForm
-            cohorts={cohorts}
+            cohorts={studentFormCohorts}
             disabled={isSubmitting}
             initialValues={editingStudent ? toFormValues(editingStudent) : undefined}
             mode="edit"

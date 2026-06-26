@@ -63,6 +63,14 @@ type StudentResponse = {
   data: StudentApiItem;
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const assertUuid = (value: string, fieldName: string) => {
+  if (!UUID_PATTERN.test(value)) {
+    throw new Error(`${fieldName} 값이 올바르지 않습니다.`);
+  }
+};
+
 const toQueryString = (params: ListStudentsParams) => {
   const searchParams = new URLSearchParams();
 
@@ -110,6 +118,8 @@ export const studentApi = {
   },
 
   approve(studentId: string, cohortId: string) {
+    assertUuid(cohortId, 'cohortId');
+
     return apiRequest<StudentResponse>(`/admin/students/${studentId}/approve`, {
       method: 'PATCH',
       body: JSON.stringify({ cohortId }),

@@ -18,8 +18,8 @@ export type StudentRow = {
 };
 
 export type StudentTableCohort = {
-  id: string;
-  name: string;
+  cohortId: string;
+  cohortName: string;
 };
 
 type StudentTableProps = {
@@ -59,7 +59,7 @@ export function StudentTable({
   onReject,
   onSuspend,
 }: StudentTableProps) {
-  const cohortMap = new Map(cohorts.map((cohort) => [cohort.id, cohort.name]));
+  const cohortMap = new Map(cohorts.map((cohort) => [cohort.cohortId, cohort.cohortName]));
 
   return (
     <div className="table-wrap">
@@ -95,12 +95,12 @@ export function StudentTable({
                 {student.status === 'pending' ? (
                   <div className="inline-action-group">
                     <select
-                      value={approvalCohortIds[student.id] ?? cohorts[0]?.id ?? ''}
+                      value={approvalCohortIds[student.id] ?? cohorts[0]?.cohortId ?? ''}
                       onChange={(event) => onApprovalCohortChange(student.id, event.target.value)}
                     >
                       {cohorts.map((cohort) => (
-                        <option key={cohort.id} value={cohort.id}>
-                          {cohort.name}
+                        <option key={cohort.cohortId} value={cohort.cohortId}>
+                          {cohort.cohortName}
                         </option>
                       ))}
                     </select>
