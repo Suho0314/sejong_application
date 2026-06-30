@@ -1034,6 +1034,119 @@ Response:
 {}
 ```
 
+### PDF 문제 일괄 등록 미리보기
+
+텍스트 기반 문제지 PDF와 정답지 PDF를 업로드해 문제·보기·정답을 추출한다. 원본 PDF는 서버에 영구 저장하지 않는다.
+
+| 항목 | 내용 |
+| --- | --- |
+| Method | `POST` |
+| URL | `/api/admin/questions/pdf-import/preview` |
+| Content-Type | `multipart/form-data` |
+| StatusCode | `200`, `400`, `401`, `403`, `422` |
+
+Form fields:
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `questionPdf` | file | 문제지 PDF. `application/pdf`, 최대 10MB |
+| `answerPdf` | file | 정답지 PDF. `application/pdf`, 최대 10MB |
+
+Response:
+
+```json
+{
+  "data": {
+    "items": [
+      {
+        "questionNumber": 1,
+        "subject": "기본간호학",
+        "category": null,
+        "content": "다음 중 활력징후에 해당하는 것은?",
+        "choices": ["혈압", "키", "몸무게", "시력", "청력"],
+        "correctAnswerIndex": 0,
+        "answerNumber": 1,
+        "status": "ready",
+        "reasons": []
+      }
+    ],
+    "summary": {
+      "total": 1,
+      "ready": 1,
+      "needsReview": 0,
+      "invalid": 0
+    }
+  }
+}
+```
+
+미리보기 상태:
+
+- `ready`: 본문, 보기 2~5개, 정답 1~5번 매칭이 완료된 문항
+- `needs_review`: 그림·도표·자료형 문항 등 자동 추출은 됐지만 강사 검토가 필요한 문항
+- `invalid`: 본문, 보기, 정답이 누락되었거나 정답 번호가 보기 범위를 벗어난 문항
+
+### PDF 문제 일괄 등록 확정 생성
+
+강사가 미리보기에서 검토·수정·선택한 문항만 문제은행에 `draft` 상태로 생성한다. 문제집, 배포, 기수, 학생 데이터는 생성하거나 수정하지 않는다.
+
+| 항목 | 내용 |
+| --- | --- |
+| Method | `POST` |
+| URL | `/api/admin/questions/pdf-import/confirm` |
+| StatusCode | `201`, `400`, `401`, `403`, `422` |
+
+Request:
+
+```json
+{
+  "permissionConfirmed": true,
+  "questions": [
+    {
+      "questionNumber": 1,
+      "subject": "기본간호학",
+      "category": null,
+      "difficulty": "medium",
+      "content": "다음 중 활력징후에 해당하는 것은?",
+      "choices": ["혈압", "키", "몸무게", "시력", "청력"],
+      "correctAnswerIndex": 0
+    }
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "data": {
+    "createdCount": 1,
+    "questions": [
+      {
+        "id": "question-uuid",
+        "subject": "기본간호학",
+        "category": null,
+        "difficulty": "medium",
+        "type": "multiple_choice",
+        "content": "다음 중 활력징후에 해당하는 것은?",
+        "choices": [
+          { "id": "choice-1", "text": "혈압" },
+          { "id": "choice-2", "text": "키" },
+          { "id": "choice-3", "text": "몸무게" },
+          { "id": "choice-4", "text": "시력" },
+          { "id": "choice-5", "text": "청력" }
+        ],
+        "correctAnswerIndex": 0,
+        "answerKey": 0,
+        "status": "draft",
+        "createdAt": "2026-06-18T09:00:00+09:00",
+        "updatedAt": "2026-06-18T09:00:00+09:00"
+      }
+    ]
+  }
+}
+```
+
 ## 문제집 CRUD
 
 ### 문제집 목록 조회

@@ -11,22 +11,42 @@ import {
   Post,
   Query,
   Req,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { AuthenticatedRequest } from '../../auth/guards/jwt-auth.guard';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
+import { ConfirmPdfQuestionImportDto } from './dto/confirm-pdf-question-import.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { ListQuestionsDto } from './dto/list-questions.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
+import { QuestionPdfImportService } from './question-pdf-import.service';
 import { QuestionsService } from './questions.service';
+
+type UploadedPdfFile = {
+  buffer: Buffer;
+  mimetype?: string;
+  originalname?: string;
+  size: number;
+};
+
+type PdfImportFiles = {
+  questionPdf?: UploadedPdfFile[];
+  answerPdf?: UploadedPdfFile[];
+};
 
 @Controller('admin/questions')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'teacher')
 export class QuestionsController {
-  constructor(private readonly questionsService: QuestionsService) {}
+  constructor(
+    private readonly questionsService: QuestionsService,
+    private readonly questionPdfImportService: QuestionPdfImportService,
+  ) {}
 
   @Get()
   listQuestions(@Query() query: ListQuestionsDto) {
@@ -41,6 +61,23 @@ export class QuestionsController {
   @Post()
   createQuestion(@Body() body: CreateQuestionDto, @Req() request: AuthenticatedRequest) {
     return this.questionsService.createQuestion(body, request.user?.sub);
+  }
+
+  @Post('pdf-import/preview')
+  @UseInterceptors(FileFieldsInterceptor([
+    { name: 'questionPdf', maxCount: 1 },
+    { name: 'answerPdf', maxCount: 1 },
+  ]))
+  previewPdfImport(@UploadedFiles() files: PdfImportFiles) {
+    return this.questionPdfImportService.preview(files.questionPdf?.[0], files.answerPdf?.[0]);
+  }
+
+  @Post('pdf-import/confirm')
+  confirmPdfImport(
+    @Body() body: ConfirmPdfQuestionImportDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.questionPdfImportService.confirm(body, request.user?.sub);
   }
 
   @Patch(':questionId')

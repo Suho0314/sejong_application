@@ -44,6 +44,30 @@ export type QuestionPayload = {
   status: ContentStatus;
 };
 
+export type PdfImportPreviewStatus = 'ready' | 'needs_review' | 'invalid';
+
+export type PdfQuestionImportPreviewItem = {
+  questionNumber: number;
+  subject: string;
+  category: string | null;
+  content: string;
+  choices: string[];
+  correctAnswerIndex: number | null;
+  answerNumber: number | null;
+  status: PdfImportPreviewStatus;
+  reasons: string[];
+};
+
+export type PdfQuestionImportConfirmItem = {
+  questionNumber?: number;
+  subject: string;
+  category?: string | null;
+  difficulty?: Difficulty;
+  content: string;
+  choices: string[];
+  correctAnswerIndex: number;
+};
+
 type QuestionListResponse = {
   data: QuestionApiItem[];
   meta: {
@@ -55,6 +79,25 @@ type QuestionListResponse = {
 
 type QuestionResponse = {
   data: QuestionApiItem;
+};
+
+type PdfQuestionImportPreviewResponse = {
+  data: {
+    items: PdfQuestionImportPreviewItem[];
+    summary: {
+      total: number;
+      ready: number;
+      needsReview: number;
+      invalid: number;
+    };
+  };
+};
+
+type PdfQuestionImportConfirmResponse = {
+  data: {
+    createdCount: number;
+    questions: QuestionApiItem[];
+  };
 };
 
 const toQueryString = (params: ListQuestionsParams) => {
@@ -103,6 +146,28 @@ export const questionApi = {
     return apiRequest<QuestionResponse>('/admin/questions', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  },
+
+  previewPdfImport(questionPdf: File, answerPdf: File) {
+    const formData = new FormData();
+
+    formData.append('questionPdf', questionPdf);
+    formData.append('answerPdf', answerPdf);
+
+    return apiRequest<PdfQuestionImportPreviewResponse>('/admin/questions/pdf-import/preview', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  confirmPdfImport(permissionConfirmed: boolean, questions: PdfQuestionImportConfirmItem[]) {
+    return apiRequest<PdfQuestionImportConfirmResponse>('/admin/questions/pdf-import/confirm', {
+      method: 'POST',
+      body: JSON.stringify({
+        permissionConfirmed,
+        questions,
+      }),
     });
   },
 

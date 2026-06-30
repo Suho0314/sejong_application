@@ -76,8 +76,9 @@ const clearAuthAndRedirectToLogin = () => {
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   const { auth = true, headers, ...requestOptions } = options;
   const requestHeaders = new Headers(headers);
+  const isFormDataBody = typeof FormData !== 'undefined' && requestOptions.body instanceof FormData;
 
-  if (!requestHeaders.has('Content-Type') && requestOptions.body) {
+  if (!requestHeaders.has('Content-Type') && requestOptions.body && !isFormDataBody) {
     requestHeaders.set('Content-Type', 'application/json');
   }
 
