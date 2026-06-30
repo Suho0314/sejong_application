@@ -4,8 +4,7 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import * as zlib from 'zlib';
-import { ConfirmPdfQuestionImportDto, ConfirmPdfQuestionDraftDto } from './dto/confirm-pdf-question-import.dto';
+import { ConfirmPdfQuestionDraftDto, ConfirmPdfQuestionImportDto } from './dto/confirm-pdf-question-import.dto';
 import { QuestionsService } from './questions.service';
 
 type UploadedPdfFile = {
@@ -13,6 +12,37 @@ type UploadedPdfFile = {
   mimetype?: string;
   originalname?: string;
   size: number;
+};
+
+type PdfTextItem = {
+  str: string;
+  transform: number[];
+  width?: number;
+  height?: number;
+};
+
+type PdfPageText = {
+  pageNumber: number;
+  lines: string[];
+};
+
+type PdfDocumentProxy = {
+  numPages: number;
+  getPage(pageNumber: number): Promise<{
+    getTextContent(): Promise<{ items: unknown[] }>;
+  }>;
+  destroy(): Promise<void>;
+};
+
+type PdfJsModule = {
+  getDocument(params: {
+    data: Uint8Array;
+    disableWorker: boolean;
+    useSystemFonts: boolean;
+    cMapPacked: boolean;
+  }): {
+    promise: Promise<PdfDocumentProxy>;
+  };
 };
 
 export type PdfImportPreviewStatus = 'ready' | 'needs_review' | 'invalid';
@@ -23,6 +53,7 @@ type ParsedQuestion = {
   category: string | null;
   content: string;
   choices: string[];
+  pageNumber: number;
 };
 
 export type PdfImportPreviewItem = ParsedQuestion & {
@@ -36,7 +67,6 @@ const MAX_PDF_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const DEFAULT_SUBJECT = 'PDF 가져오기';
 const DEFAULT_DIFFICULTY = 'medium' as const;
 const IMAGE_HINT_PATTERN = /(그림|도표|표\s*\d*|사진|자료|이미지|위\s*자료|아래\s*자료|다음\s*그림|다음\s*표)/;
-const NUMBERED_CHOICE_PATTERN = /^([1-5])[\).．]?\s+(.+)$/;
 const CIRCLED_CHOICE_MAP = new Map([
   ['①', 1],
   ['②', 2],
@@ -49,14 +79,34 @@ const CIRCLED_CHOICE_MAP = new Map([
 export class QuestionPdfImportService {
   constructor(private readonly questionsService: QuestionsService) {}
 
-  preview(questionPdf?: UploadedPdfFile, answerPdf?: UploadedPdfFile) {
+  async preview(questionPdf?: UploadedPdfFile, answerPdf?: UploadedPdfFile) {
     this.assertPdfFile(questionPdf, '문제지 PDF');
     this.assertPdfFile(answerPdf, '정답지 PDF');
 
-    const questionText = this.extractPdfText(questionPdf.buffer);
-    const answerText = this.extractPdfText(answerPdf.buffer);
-    const parsedQuestions = this.parseQuestions(questionText);
-    const answersByNumber = this.parseAnswers(answerText);
+    const questionPages = await this.extractPdfPages(questionPdf.buffer);
+    const answerPages = await this.extractPdfPages(answerPdf.buffer);
+    const parsedQuestions = this.parseQuestions(questionPages);
+    const answersByNumber = this.parseAnswers(answerPages);
+
+    if (parsedQuestions.length === 0) {
+      throw new UnprocessableEntityException({
+        error: {
+          code: 'PDF_QUESTION_PARSE_FAILED',
+          message: '문제지에서 문항을 찾지 못했습니다. 텍스트 기반 PDF와 문항 번호 형식을 확인해주세요.',
+          details: [],
+        },
+      });
+    }
+
+    if (parsedQuestions.length <= 1 && this.countQuestionStartCandidates(questionPages) > 1) {
+      throw new UnprocessableEntityException({
+        error: {
+          code: 'PDF_QUESTION_BOUNDARY_FAILED',
+          message: '문항 경계를 안정적으로 분리하지 못했습니다. PDF 텍스트 레이아웃을 확인해주세요.',
+          details: [],
+        },
+      });
+    }
 
     const items = parsedQuestions.map((question) => this.toPreviewItem(question, answersByNumber));
 
@@ -190,122 +240,108 @@ export class QuestionPdfImportService {
     }
   }
 
-  private extractPdfText(buffer: Buffer): string {
-    const source = buffer.toString('latin1');
-    const chunks: string[] = [];
-    const streamPattern = /(\d+\s+\d+\s+obj[\s\S]*?)stream\r?\n([\s\S]*?)\r?\nendstream/g;
-    let match: RegExpExecArray | null;
+  private async extractPdfPages(buffer: Buffer): Promise<PdfPageText[]> {
+    const pdfjs = await this.loadPdfJs();
+    const loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(buffer),
+      disableWorker: true,
+      useSystemFonts: true,
+      cMapPacked: true,
+    });
+    const document = await loadingTask.promise;
 
-    while ((match = streamPattern.exec(source)) !== null) {
-      const [, objectHeader, rawStream] = match;
-      const streamBuffer = Buffer.from(rawStream, 'latin1');
-      const contentBuffer = objectHeader.includes('/FlateDecode')
-        ? this.tryInflate(streamBuffer)
-        : streamBuffer;
-      const content = contentBuffer.toString('latin1');
-
-      chunks.push(this.extractTextFromContentStream(content));
-    }
-
-    const text = chunks.join('\n').replace(/\u0000/g, '').trim();
-
-    if (!text) {
-      throw new UnprocessableEntityException({
-        error: {
-          code: 'PDF_TEXT_EXTRACTION_FAILED',
-          message: 'PDF에서 텍스트를 추출하지 못했습니다. 텍스트 기반 PDF인지 확인해주세요.',
-          details: [],
-        },
-      });
-    }
-
-    return this.normalizeText(text);
-  }
-
-  private tryInflate(buffer: Buffer): Buffer {
     try {
-      return zlib.inflateSync(buffer);
-    } catch {
-      try {
-        return zlib.inflateRawSync(buffer);
-      } catch {
-        return buffer;
+      const pages: PdfPageText[] = [];
+
+      for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+        const page = await document.getPage(pageNumber);
+        const textContent = await page.getTextContent();
+        const items = textContent.items.filter(this.isPdfTextItem);
+        const lines = this.rebuildLinesFromTextItems(items);
+
+        pages.push({ pageNumber, lines });
       }
+
+      if (pages.every((page) => page.lines.length === 0)) {
+        throw new UnprocessableEntityException({
+          error: {
+            code: 'PDF_TEXT_EXTRACTION_FAILED',
+            message: 'PDF에서 텍스트를 추출하지 못했습니다. 텍스트 기반 PDF인지 확인해주세요.',
+            details: [],
+          },
+        });
+      }
+
+      return pages;
+    } finally {
+      await document.destroy();
     }
   }
 
-  private extractTextFromContentStream(content: string): string {
-    const textChunks: string[] = [];
-    const textBlockPattern = /BT([\s\S]*?)ET/g;
-    let blockMatch: RegExpExecArray | null;
+  private async loadPdfJs(): Promise<PdfJsModule> {
+    return import('pdfjs-dist/legacy/build/pdf.js') as Promise<PdfJsModule>;
+  }
 
-    while ((blockMatch = textBlockPattern.exec(content)) !== null) {
-      const block = blockMatch[1]
-        .replace(/T\*/g, '\n')
-        .replace(/\s'Tj/g, '\n')
-        .replace(/\s"Tj/g, '\n');
-      const stringPattern = /<([0-9A-Fa-f\s]+)>|\((?:\\.|[^\\)])*\)/g;
-      let stringMatch: RegExpExecArray | null;
+  private isPdfTextItem(item: unknown): item is PdfTextItem {
+    if (!item || typeof item !== 'object') return false;
 
-      while ((stringMatch = stringPattern.exec(block)) !== null) {
-        const token = stringMatch[0];
+    const maybeTextItem = item as Partial<PdfTextItem>;
+    return typeof maybeTextItem.str === 'string' && Array.isArray(maybeTextItem.transform);
+  }
 
-        if (token.startsWith('<')) {
-          textChunks.push(this.decodeHexString(stringMatch[1]));
-          continue;
-        }
+  private rebuildLinesFromTextItems(items: PdfTextItem[]): string[] {
+    const rows: Array<{ y: number; items: Array<{ x: number; text: string }> }> = [];
+    const yTolerance = 4;
 
-        textChunks.push(this.decodeLiteralString(token.slice(1, -1)));
+    for (const item of items) {
+      const text = this.normalizePdfText(item.str);
+
+      if (!text) continue;
+
+      const x = Number(item.transform[4] ?? 0);
+      const y = Number(item.transform[5] ?? 0);
+      let row = rows.find((candidate) => Math.abs(candidate.y - y) <= yTolerance);
+
+      if (!row) {
+        row = { y, items: [] };
+        rows.push(row);
       }
 
-      textChunks.push('\n');
+      row.items.push({ x, text });
     }
 
-    return textChunks.join(' ');
+    return rows
+      .sort((left, right) => right.y - left.y)
+      .flatMap((row) =>
+        this.expandLogicalLines(
+          row.items
+            .sort((left, right) => left.x - right.x)
+            .map((item) => item.text)
+            .join(' '),
+        ),
+      )
+      .map((line) => line.trim())
+      .filter(Boolean);
   }
 
-  private decodeLiteralString(value: string): string {
-    return value
-      .replace(/\\n/g, '\n')
-      .replace(/\\r/g, '\n')
-      .replace(/\\t/g, ' ')
-      .replace(/\\([()\\])/g, '$1')
-      .replace(/\\([0-7]{1,3})/g, (_, octal: string) => String.fromCharCode(parseInt(octal, 8)));
-  }
-
-  private decodeHexString(value: string): string {
-    const normalized = value.replace(/\s/g, '');
-    const evenHex = normalized.length % 2 === 0 ? normalized : `${normalized}0`;
-    const bytes = Buffer.from(evenHex, 'hex');
-
-    if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
-      const chars: string[] = [];
-
-      for (let index = 2; index + 1 < bytes.length; index += 2) {
-        chars.push(String.fromCharCode(bytes.readUInt16BE(index)));
-      }
-
-      return chars.join('');
-    }
-
-    return bytes.toString('utf8').replace(/\u0000/g, '');
-  }
-
-  private normalizeText(text: string): string {
+  private normalizePdfText(text: string): string {
     return text
+      .replace(/\u0000/g, '')
       .replace(/\r/g, '\n')
       .replace(/[ \t]+/g, ' ')
-      .replace(/\s+([①②③④⑤])/g, '\n$1 ')
-      .replace(/\s+(\d{1,3})[\).．]\s+/g, '\n$1. ')
-      .replace(/\n{2,}/g, '\n')
       .trim();
   }
 
-  private parseQuestions(text: string): ParsedQuestion[] {
-    const lines = text
+  private expandLogicalLines(line: string): string[] {
+    return line
+      .replace(/\s+(?=[①②③④⑤])/g, '\n')
+      .replace(/\s+(?=[1-5][\).．]\s)/g, '\n')
       .split('\n')
-      .map((line) => line.trim())
+      .map((value) => value.trim())
       .filter(Boolean);
+  }
+
+  private parseQuestions(pages: PdfPageText[]): ParsedQuestion[] {
     const questions: ParsedQuestion[] = [];
     let currentQuestion: ParsedQuestion | null = null;
     let currentSubject = DEFAULT_SUBJECT;
@@ -316,48 +352,65 @@ export class QuestionPdfImportService {
 
       currentQuestion.content = this.cleanText(currentQuestion.content);
       currentQuestion.choices = currentQuestion.choices.map((choice) => this.cleanText(choice)).filter(Boolean);
-      questions.push(currentQuestion);
+
+      if (!questions.some((question) => question.questionNumber === currentQuestion?.questionNumber)) {
+        questions.push(currentQuestion);
+      }
+
       currentQuestion = null;
     };
 
-    for (const line of lines) {
-      const section = this.parseSectionLine(line);
+    for (const page of pages) {
+      for (const line of page.lines) {
+        const section = this.parseSectionLine(line);
 
-      if (section) {
-        currentSubject = section.subject;
-        currentCategory = section.category;
-        continue;
+        if (section) {
+          currentSubject = section.subject;
+          currentCategory = section.category;
+          continue;
+        }
+
+        const questionStart = this.parseQuestionStart(line, currentQuestion);
+
+        if (questionStart) {
+          flushQuestion();
+          currentQuestion = {
+            questionNumber: questionStart.questionNumber,
+            subject: currentSubject,
+            category: currentCategory,
+            content: questionStart.content,
+            choices: [],
+            pageNumber: page.pageNumber,
+          };
+          continue;
+        }
+
+        if (!currentQuestion) continue;
+
+        const choice = this.parseChoiceLine(line);
+
+        if (choice) {
+          const existing = currentQuestion.choices[choice.index - 1] ?? '';
+          currentQuestion.choices[choice.index - 1] = existing
+            ? `${existing} ${choice.text}`
+            : choice.text;
+          continue;
+        }
+
+        const lastChoiceIndex = this.findLastChoiceIndex(currentQuestion.choices);
+
+        if (lastChoiceIndex >= 0 && !this.looksLikeQuestionContinuation(line)) {
+          currentQuestion.choices[lastChoiceIndex] = `${currentQuestion.choices[lastChoiceIndex]} ${line}`;
+          continue;
+        }
+
+        currentQuestion.content = `${currentQuestion.content} ${line}`;
       }
-
-      const questionStart = line.match(/^(?:문제\s*)?(\d{1,3})[\).．]\s*(.+)$/);
-
-      if (questionStart) {
-        flushQuestion();
-        currentQuestion = {
-          questionNumber: Number(questionStart[1]),
-          subject: currentSubject,
-          category: currentCategory,
-          content: questionStart[2],
-          choices: [],
-        };
-        continue;
-      }
-
-      if (!currentQuestion) continue;
-
-      const choice = this.parseChoiceLine(line);
-
-      if (choice) {
-        currentQuestion.choices[choice.index - 1] = choice.text;
-        continue;
-      }
-
-      currentQuestion.content = `${currentQuestion.content} ${line}`;
     }
 
     flushQuestion();
 
-    return questions;
+    return questions.sort((left, right) => left.questionNumber - right.questionNumber);
   }
 
   private parseSectionLine(line: string): { subject: string; category: string | null } | null {
@@ -376,6 +429,29 @@ export class QuestionPdfImportService {
     return null;
   }
 
+  private parseQuestionStart(
+    line: string,
+    currentQuestion: ParsedQuestion | null,
+  ): { questionNumber: number; content: string } | null {
+    const match = line.match(/^(?:문제\s*)?(\d{1,3})[\).．]\s*(.+)$/);
+
+    if (!match) return null;
+
+    const questionNumber = Number(match[1]);
+    const startsWithQuestionWord = /^문제\s*/.test(line);
+    const isClearlyQuestionNumber = questionNumber > 5;
+    const followsCurrentQuestion =
+      currentQuestion !== null &&
+      questionNumber === currentQuestion.questionNumber + 1 &&
+      currentQuestion.choices.filter(Boolean).length >= 2;
+
+    if (!currentQuestion || startsWithQuestionWord || isClearlyQuestionNumber || followsCurrentQuestion) {
+      return { questionNumber, content: match[2].trim() };
+    }
+
+    return null;
+  }
+
   private parseChoiceLine(line: string): { index: number; text: string } | null {
     const circled = CIRCLED_CHOICE_MAP.get(line[0]);
 
@@ -383,33 +459,67 @@ export class QuestionPdfImportService {
       return { index: circled, text: line.slice(1).trim() };
     }
 
-    const numbered = line.match(NUMBERED_CHOICE_PATTERN);
+    const numbered = line.match(/^([1-5])[\).．]\s+(.+)$/);
 
     if (!numbered) return null;
 
     return { index: Number(numbered[1]), text: numbered[2].trim() };
   }
 
-  private parseAnswers(text: string): Map<number, number> {
-    const answers = new Map<number, number>();
-    const normalized = text.replace(/[①②③④⑤]/g, (value) => String(CIRCLED_CHOICE_MAP.get(value) ?? value));
-    const answerPattern = /(?:^|\s)(\d{1,3})\s*(?:번|[.)．])?\s*(?:정답|답|answer)?\s*[:：]?\s*([1-5])(?=\s|$)/gi;
-    let match: RegExpExecArray | null;
+  private findLastChoiceIndex(choices: string[]): number {
+    for (let index = choices.length - 1; index >= 0; index -= 1) {
+      if (choices[index]) return index;
+    }
 
-    while ((match = answerPattern.exec(normalized)) !== null) {
-      answers.set(Number(match[1]), Number(match[2]));
+    return -1;
+  }
+
+  private looksLikeQuestionContinuation(line: string): boolean {
+    return /^(?:다음|아래|위|보기|자료|그림|표)\b/.test(line);
+  }
+
+  private parseAnswers(pages: PdfPageText[]): Map<number, number> {
+    const answers = new Map<number, number>();
+    const lines = pages.flatMap((page) => page.lines);
+
+    for (const line of lines) {
+      const normalized = this.replaceCircledNumbers(line);
+      const explicitPattern =
+        /(?:^|\s)(\d{1,3})\s*(?:번)?\s*(?:정답|답|answer)?\s*[:：]?\s*([1-5])(?:번)?(?=\s|$)/gi;
+      let match: RegExpExecArray | null;
+
+      while ((match = explicitPattern.exec(normalized)) !== null) {
+        answers.set(Number(match[1]), Number(match[2]));
+      }
     }
 
     return answers;
+  }
+
+  private replaceCircledNumbers(value: string): string {
+    return value.replace(/[①②③④⑤]/g, (matched) => String(CIRCLED_CHOICE_MAP.get(matched) ?? matched));
+  }
+
+  private countQuestionStartCandidates(pages: PdfPageText[]): number {
+    return pages
+      .flatMap((page) => page.lines)
+      .filter((line) => /^(?:문제\s*)?\d{1,3}[\).．]\s+/.test(line))
+      .length;
   }
 
   private toPreviewItem(question: ParsedQuestion, answersByNumber: Map<number, number>): PdfImportPreviewItem {
     const reasons: string[] = [];
     const answerNumber = answersByNumber.get(question.questionNumber) ?? null;
     const choices = question.choices.filter(Boolean);
+    const content = this.cleanText(question.content);
+    const combinedText = [content, ...choices].join(' ');
 
-    if (!question.content.trim()) {
+    if (!content) {
       reasons.push('문제 본문을 추출하지 못했습니다.');
+    }
+
+    if (content.length > 0 && content.length < 8) {
+      reasons.push('문제 본문이 비정상적으로 짧습니다.');
     }
 
     if (choices.length < 2) {
@@ -428,25 +538,41 @@ export class QuestionPdfImportService {
       reasons.push('정답 번호가 보기 개수를 초과합니다.');
     }
 
-    if (IMAGE_HINT_PATTERN.test(question.content)) {
+    if (this.hasBrokenText(combinedText)) {
+      reasons.push('깨진 문자 또는 비정상 인코딩이 감지되었습니다.');
+    }
+
+    if (IMAGE_HINT_PATTERN.test(content)) {
       reasons.push('그림·도표·자료형 문항일 수 있어 검토가 필요합니다.');
     }
 
     const invalid = reasons.some((reason) =>
       reason.includes('못했습니다') ||
+      reason.includes('짧습니다') ||
       reason.includes('2개 미만') ||
       reason.includes('5개를 초과') ||
-      reason.includes('초과합니다'),
+      reason.includes('초과합니다') ||
+      reason.includes('깨진 문자'),
     );
 
     return {
       ...question,
+      content,
       choices,
       correctAnswerIndex: answerNumber ? answerNumber - 1 : null,
       answerNumber,
       status: invalid ? 'invalid' : reasons.length > 0 ? 'needs_review' : 'ready',
       reasons,
     };
+  }
+
+  private hasBrokenText(value: string): boolean {
+    if (!value) return true;
+
+    const suspiciousCount = (value.match(/[�□■�]/g) ?? []).length;
+    const visibleLength = value.replace(/\s/g, '').length;
+
+    return suspiciousCount > 0 || (visibleLength > 0 && suspiciousCount / visibleLength > 0.02);
   }
 
   private cleanText(value: string): string {
