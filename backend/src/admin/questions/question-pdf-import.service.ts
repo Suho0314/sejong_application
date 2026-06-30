@@ -53,6 +53,11 @@ type ParsedQuestion = {
   pageNumber: number;
 };
 
+type ParsedAnswer = {
+  answerIndex: number;
+  subject: string | null;
+};
+
 export type PdfImportPreviewItem = ParsedQuestion & {
   correctAnswerIndex: number | null;
   answerNumber: number | null;
@@ -648,35 +653,156 @@ export class QuestionPdfImportService {
     return /^(?:다음|아래|위|보기|자료|그림|표)\b/.test(line);
   }
 
-  private parseAnswers(pages: PdfPageText[]): Map<number, number> {
-    const answers = new Map<number, number>();
+  private parseAnswers(pages: PdfPageText[]): Map<number, ParsedAnswer> {
+    const answers = new Map<number, ParsedAnswer>();
     const lines = pages.flatMap((page) => page.lines);
+    let currentSubject: string | null = null;
 
     for (const line of lines) {
       const normalized = this.replaceCircledNumbers(line);
-      const explicitPattern =
-        /(?:^|\s)(\d{1,3})\s*(?:번)?\s*(?:정답|답|answer)?\s*[:：]?\s*([1-5])(?:번)?(?=\s|$)/gi;
-      let match: RegExpExecArray | null;
+      const structuredRows = this.parseStructuredAnswerRows(normalized);
 
-      while ((match = explicitPattern.exec(normalized)) !== null) {
-        answers.set(Number(match[1]), Number(match[2]));
+      if (structuredRows.length > 0) {
+        for (const row of structuredRows) {
+          if (row.subject) {
+            currentSubject = row.subject;
+          }
+
+          answers.set(row.questionNumber, {
+            answerIndex: row.answerNumber - 1,
+            subject: row.subject ?? currentSubject,
+          });
+        }
+
+        continue;
       }
 
-      const numericTokens = normalized.match(/\d{1,3}/g)?.map(Number) ?? [];
+      const explicitSubject = this.parseAnswerSubjectLine(normalized);
 
-      if (numericTokens.length >= 2) {
-        for (let index = 0; index < numericTokens.length - 1; index += 2) {
-          const questionNumber = numericTokens[index];
-          const answerNumber = numericTokens[index + 1];
+      if (explicitSubject) {
+        currentSubject = explicitSubject;
+      }
 
-          if (questionNumber >= 1 && questionNumber <= 300 && answerNumber >= 1 && answerNumber <= 5) {
-            answers.set(questionNumber, answerNumber);
-          }
-        }
+      const explicitPairs = this.parseExplicitAnswerPairs(normalized);
+
+      for (const pair of explicitPairs) {
+        answers.set(pair.questionNumber, {
+          answerIndex: pair.answerNumber - 1,
+          subject: currentSubject,
+        });
+      }
+
+      if (explicitPairs.length > 0) {
+        continue;
+      }
+
+      const numericPairs = this.parseNumericAnswerPairs(normalized);
+
+      for (const pair of numericPairs) {
+        answers.set(pair.questionNumber, {
+          answerIndex: pair.answerNumber - 1,
+          subject: currentSubject,
+        });
       }
     }
 
     return answers;
+  }
+
+  private parseStructuredAnswerRows(
+    line: string,
+  ): Array<{ questionNumber: number; answerNumber: number; subject: string | null }> {
+    const rows: Array<{ questionNumber: number; answerNumber: number; subject: string | null }> = [];
+    const normalized = line.replace(/[|│]/g, ' ').replace(/\s+/g, ' ').trim();
+    const rowPattern =
+      /(?:^|\s)(?:(?:\d+\s*)?교시\s+|\d+\s+)?([가-힣A-Za-z][가-힣A-Za-z0-9·ㆍ/()\- ]{1,50}?)\s+(\d{1,3})\s+([1-5])(?=\s|$)/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = rowPattern.exec(normalized)) !== null) {
+      const subject = this.cleanAnswerSubject(match[1]);
+      const questionNumber = Number(match[2]);
+      const answerNumber = Number(match[3]);
+
+      if (!subject || !this.isValidQuestionAnswerPair(questionNumber, answerNumber)) continue;
+
+      rows.push({ questionNumber, answerNumber, subject });
+    }
+
+    return rows;
+  }
+
+  private parseAnswerSubjectLine(line: string): string | null {
+    const explicit = line.match(/(?:과목|영역|분류)\s*[:：]\s*([가-힣A-Za-z][가-힣A-Za-z0-9·ㆍ/()\- ]{1,50})/);
+
+    if (explicit) {
+      return this.cleanAnswerSubject(explicit[1]);
+    }
+
+    const periodSubject = line.match(/^(?:(?:\d+\s*)?교시\s+)([가-힣A-Za-z][가-힣A-Za-z0-9·ㆍ/()\- ]{1,50})$/);
+
+    if (periodSubject) {
+      return this.cleanAnswerSubject(periodSubject[1]);
+    }
+
+    if (!/\d/.test(line)) {
+      return this.cleanAnswerSubject(line);
+    }
+
+    return null;
+  }
+
+  private parseExplicitAnswerPairs(line: string): Array<{ questionNumber: number; answerNumber: number }> {
+    const pairs: Array<{ questionNumber: number; answerNumber: number }> = [];
+    const explicitPattern =
+      /(?:^|\s)(\d{1,3})\s*(?:번)?\s*(?:정답|답|answer)\s*[:：]?\s*([1-5])(?:번)?(?=\s|$)/gi;
+    let match: RegExpExecArray | null;
+
+    while ((match = explicitPattern.exec(line)) !== null) {
+      const questionNumber = Number(match[1]);
+      const answerNumber = Number(match[2]);
+
+      if (this.isValidQuestionAnswerPair(questionNumber, answerNumber)) {
+        pairs.push({ questionNumber, answerNumber });
+      }
+    }
+
+    return pairs;
+  }
+
+  private parseNumericAnswerPairs(line: string): Array<{ questionNumber: number; answerNumber: number }> {
+    const pairs: Array<{ questionNumber: number; answerNumber: number }> = [];
+    const numericTokens = line.match(/\d{1,3}/g)?.map(Number) ?? [];
+
+    if (numericTokens.length < 2) return pairs;
+
+    for (let index = 0; index < numericTokens.length - 1; index += 2) {
+      const questionNumber = numericTokens[index];
+      const answerNumber = numericTokens[index + 1];
+
+      if (this.isValidQuestionAnswerPair(questionNumber, answerNumber)) {
+        pairs.push({ questionNumber, answerNumber });
+      }
+    }
+
+    return pairs;
+  }
+
+  private cleanAnswerSubject(value: string): string | null {
+    const subject = this.cleanText(value)
+      .replace(/^(?:\d+\s*)?교시\s+/, '')
+      .replace(/^(?:과목|영역|분류)\s*[:：]?\s*/, '')
+      .replace(/\b(?:문제번호|문항번호|최종답안|정답|답안|번호)\b/g, '')
+      .trim();
+
+    if (!subject || subject.length > 60) return null;
+    if (!/[가-힣A-Za-z]/.test(subject)) return null;
+    if (/^(?:교시|과목|문제번호|문항번호|최종답안|정답|답안|번호)$/i.test(subject)) return null;
+
+    return subject;
+  }
+
+  private isValidQuestionAnswerPair(questionNumber: number, answerNumber: number): boolean {
+    return questionNumber >= 1 && questionNumber <= 300 && answerNumber >= 1 && answerNumber <= 5;
   }
 
   private replaceCircledNumbers(value: string): string {
@@ -690,9 +816,33 @@ export class QuestionPdfImportService {
       .length;
   }
 
-  private toPreviewItem(question: ParsedQuestion, answersByNumber: Map<number, number>): PdfImportPreviewItem {
+  private resolvePreviewSubject(question: ParsedQuestion, answer: ParsedAnswer | undefined): string {
+    const answerSubject = answer?.subject?.trim();
+
+    if (answerSubject) {
+      return answerSubject;
+    }
+
+    if (question.subject.trim()) {
+      return question.subject.trim();
+    }
+
+    return DEFAULT_SUBJECT;
+  }
+
+  private shouldShowSubjectReviewReason(question: ParsedQuestion, answer: ParsedAnswer | undefined): boolean {
+    if (answer?.subject?.trim()) {
+      return false;
+    }
+
+    return !question.subject.trim() || question.subject.trim() === DEFAULT_SUBJECT;
+  }
+
+  private toPreviewItem(question: ParsedQuestion, answersByNumber: Map<number, ParsedAnswer>): PdfImportPreviewItem {
     const reasons: string[] = [];
-    const answerNumber = answersByNumber.get(question.questionNumber) ?? null;
+    const answer = answersByNumber.get(question.questionNumber);
+    const answerNumber = answer ? answer.answerIndex + 1 : null;
+    const subject = this.resolvePreviewSubject(question, answer);
     const choices = question.choices.filter(Boolean);
     const content = this.cleanText(question.content);
     const combinedText = [content, ...choices].join(' ');
@@ -721,6 +871,10 @@ export class QuestionPdfImportService {
       reasons.push('정답 번호가 보기 개수를 초과합니다.');
     }
 
+    if (this.shouldShowSubjectReviewReason(question, answer)) {
+      reasons.push('정답지 과목 정보를 찾지 못해 기본 과목으로 표시합니다.');
+    }
+
     if (this.hasBrokenText(combinedText)) {
       reasons.push('깨진 문자 또는 비정상 인코딩이 감지되었습니다.');
     }
@@ -740,9 +894,10 @@ export class QuestionPdfImportService {
 
     return {
       ...question,
+      subject,
       content,
       choices,
-      correctAnswerIndex: answerNumber ? answerNumber - 1 : null,
+      correctAnswerIndex: answer ? answer.answerIndex : null,
       answerNumber,
       status: invalid ? 'invalid' : reasons.length > 0 ? 'needs_review' : 'ready',
       reasons,
