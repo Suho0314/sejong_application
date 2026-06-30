@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { questionApi, QuestionApiItem, QuestionPayload } from '../../../api/questions';
+import {
+  PdfQuestionImportPreviewItem,
+  questionApi,
+  QuestionApiItem,
+  QuestionPayload,
+} from '../../../api/questions';
 import { Pagination } from '../../../components/admin/Pagination';
 import { QuestionForm, QuestionFormValues } from '../../../components/admin/QuestionForm';
 import { QuestionRow, QuestionTable } from '../../../components/admin/QuestionTable';
@@ -16,6 +21,18 @@ type QuestionFilterOption = {
 type QuestionFilter = 'all' | string;
 type DifficultyFilter = 'all' | Difficulty;
 type StatusFilter = 'all' | ContentStatus;
+
+type EditablePdfImportQuestion = PdfQuestionImportPreviewItem & {
+  included: boolean;
+};
+
+const importStatusLabels: Record<EditablePdfImportQuestion['status'], string> = {
+  ready: '생성 가능',
+  needs_review: '검토 필요',
+  invalid: '생성 불가',
+};
+
+const DEFAULT_IMPORT_SUBJECT = 'PDF 가져오기';
 
 const toRow = (question: QuestionApiItem): QuestionRow => ({
   id: question.id,
@@ -72,9 +89,29 @@ export function QuestionPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
+  const [questionPdfFile, setQuestionPdfFile] = useState<File | null>(null);
+  const [answerPdfFile, setAnswerPdfFile] = useState<File | null>(null);
+  const [importQuestions, setImportQuestions] = useState<EditablePdfImportQuestion[]>([]);
+  const [isParsingPdf, setIsParsingPdf] = useState(false);
+  const [isCreatingDrafts, setIsCreatingDrafts] = useState(false);
+  const [importErrorMessage, setImportErrorMessage] = useState('');
+  const [importSuccessMessage, setImportSuccessMessage] = useState('');
+  const [permissionConfirmed, setPermissionConfirmed] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
+  const selectedImportQuestions = importQuestions.filter(
+    (question) =>
+      question.included &&
+      question.status !== 'invalid' &&
+      question.content.trim() &&
+      question.choices.filter((choice) => choice.trim()).length >= 2 &&
+      question.choices.filter((choice) => choice.trim()).length <= 5 &&
+      question.correctAnswerIndex !== null &&
+      question.correctAnswerIndex >= 0 &&
+      question.correctAnswerIndex < question.choices.filter((choice) => choice.trim()).length,
+  );
 
   const subjects = useMemo(
     () => Array.from(new Set([...filterOptions.subjects, ...questions.map((question) => question.subject)])).sort(),
@@ -178,6 +215,136 @@ export function QuestionPage() {
     setPage(1);
   };
 
+  const resetPdfImport = () => {
+    setQuestionPdfFile(null);
+    setAnswerPdfFile(null);
+    setImportQuestions([]);
+    setImportErrorMessage('');
+    setImportSuccessMessage('');
+    setPermissionConfirmed(false);
+  };
+
+  const handlePdfPreview = async () => {
+    if (!questionPdfFile || !answerPdfFile) {
+      setImportErrorMessage('문제지 PDF와 정답지 PDF를 모두 선택해주세요.');
+      return;
+    }
+
+    setIsParsingPdf(true);
+    setImportErrorMessage('');
+    setImportSuccessMessage('');
+
+    try {
+      const response = await questionApi.previewPdfImport(questionPdfFile, answerPdfFile);
+      setImportQuestions(
+        response.data.items.map((item) => ({
+          ...item,
+          included: item.status === 'ready',
+          subject: item.subject || DEFAULT_IMPORT_SUBJECT,
+          category: item.category ?? '',
+          correctAnswerIndex: item.correctAnswerIndex ?? 0,
+        })),
+      );
+      setPermissionConfirmed(false);
+    } catch (error) {
+      setImportQuestions([]);
+      setImportErrorMessage(error instanceof Error ? error.message : 'PDF를 파싱하지 못했습니다.');
+    } finally {
+      setIsParsingPdf(false);
+    }
+  };
+
+  const updateImportQuestion = (
+    index: number,
+    updater: (question: EditablePdfImportQuestion) => EditablePdfImportQuestion,
+  ) => {
+    setImportQuestions((current) =>
+      current.map((question, questionIndex) => (questionIndex === index ? updater(question) : question)),
+    );
+  };
+
+  const updateImportChoice = (questionIndex: number, choiceIndex: number, value: string) => {
+    updateImportQuestion(questionIndex, (question) => ({
+      ...question,
+      choices: question.choices.map((choice, index) => (index === choiceIndex ? value : choice)),
+    }));
+  };
+
+  const addImportChoice = (questionIndex: number) => {
+    updateImportQuestion(questionIndex, (question) => {
+      if (question.choices.length >= 5) return question;
+
+      return {
+        ...question,
+        choices: [...question.choices, ''],
+      };
+    });
+  };
+
+  const removeImportChoice = (questionIndex: number, choiceIndex: number) => {
+    updateImportQuestion(questionIndex, (question) => {
+      if (question.choices.length <= 2) return question;
+
+      const nextChoices = question.choices.filter((_, index) => index !== choiceIndex);
+      const nextCorrectAnswerIndex =
+        question.correctAnswerIndex === choiceIndex
+          ? 0
+          : question.correctAnswerIndex !== null && question.correctAnswerIndex > choiceIndex
+            ? question.correctAnswerIndex - 1
+            : question.correctAnswerIndex;
+
+      return {
+        ...question,
+        choices: nextChoices,
+        correctAnswerIndex:
+          nextCorrectAnswerIndex === null
+            ? 0
+            : Math.min(nextCorrectAnswerIndex, nextChoices.length - 1),
+      };
+    });
+  };
+
+  const handleCreatePdfDrafts = async () => {
+    if (!permissionConfirmed) {
+      setImportErrorMessage('문제 사용 권한 확인이 필요합니다.');
+      return;
+    }
+
+    if (selectedImportQuestions.length === 0) {
+      setImportErrorMessage('생성할 문항을 1개 이상 선택해주세요.');
+      return;
+    }
+
+    setIsCreatingDrafts(true);
+    setImportErrorMessage('');
+    setImportSuccessMessage('');
+
+    try {
+      const response = await questionApi.confirmPdfImport(
+        permissionConfirmed,
+        selectedImportQuestions.map((question) => ({
+          questionNumber: question.questionNumber,
+          subject: question.subject.trim() || DEFAULT_IMPORT_SUBJECT,
+          category: question.category?.trim() || null,
+          difficulty: 'medium',
+          content: question.content.trim(),
+          choices: question.choices.map((choice) => choice.trim()).filter(Boolean),
+          correctAnswerIndex: question.correctAnswerIndex ?? 0,
+        })),
+      );
+
+      setImportSuccessMessage(`${response.data.createdCount}개 문제가 draft 상태로 생성되었습니다.`);
+      setImportQuestions([]);
+      setPermissionConfirmed(false);
+      setPage(1);
+      await Promise.all([loadQuestions(1), loadFilterOptions()]);
+    } catch (error) {
+      setImportErrorMessage(error instanceof Error ? error.message : 'PDF 문제 초안을 생성하지 못했습니다.');
+    } finally {
+      setIsCreatingDrafts(false);
+    }
+  };
+
   const handleCreate = async (values: QuestionFormValues) => {
     setIsSubmitting(true);
     setErrorMessage('');
@@ -239,10 +406,238 @@ export function QuestionPage() {
           <p className="eyebrow">Question Bank</p>
           <h1>문제관리</h1>
         </div>
-        <button className="primary-button" type="button" onClick={() => setIsCreating(true)}>
-          문제 추가
-        </button>
+        <div className="form-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => {
+              setIsPdfImportOpen((current) => !current);
+              setIsCreating(false);
+              setEditingQuestion(null);
+            }}
+          >
+            PDF 문제 일괄 등록
+          </button>
+          <button className="primary-button" type="button" onClick={() => setIsCreating(true)}>
+            문제 추가
+          </button>
+        </div>
       </section>
+
+      {isPdfImportOpen ? (
+        <section className="dashboard-panel">
+          <div className="panel-header">
+            <div>
+              <h2>PDF 문제 일괄 등록</h2>
+              <p>문제지 PDF와 정답지 PDF를 분석한 뒤, 선택한 문항만 문제은행 draft로 생성합니다.</p>
+            </div>
+            <button className="secondary-button" type="button" onClick={resetPdfImport}>
+              초기화
+            </button>
+          </div>
+
+          <div className="cohort-form">
+            <div className="form-grid">
+              <label>
+                <span>문제지 PDF</span>
+                <input
+                  accept="application/pdf,.pdf"
+                  disabled={isParsingPdf || isCreatingDrafts}
+                  type="file"
+                  onChange={(event) => setQuestionPdfFile(event.target.files?.[0] ?? null)}
+                />
+              </label>
+              <label>
+                <span>정답지 PDF</span>
+                <input
+                  accept="application/pdf,.pdf"
+                  disabled={isParsingPdf || isCreatingDrafts}
+                  type="file"
+                  onChange={(event) => setAnswerPdfFile(event.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
+
+            <div className="form-actions">
+              <button
+                className="primary-button"
+                disabled={isParsingPdf || isCreatingDrafts}
+                type="button"
+                onClick={() => void handlePdfPreview()}
+              >
+                {isParsingPdf ? 'PDF 분석 중...' : '미리보기 생성'}
+              </button>
+              <span className="table-subtitle">
+                텍스트 기반 PDF만 지원하며 원본 파일은 저장하지 않습니다.
+              </span>
+            </div>
+
+            {importErrorMessage ? <p className="table-subtitle">{importErrorMessage}</p> : null}
+            {importSuccessMessage ? <p className="table-subtitle">{importSuccessMessage}</p> : null}
+
+            {importQuestions.length > 0 ? (
+              <>
+                <div className="panel-header">
+                  <div>
+                    <h2>파싱 결과 미리보기</h2>
+                    <p>
+                      생성 예정 {selectedImportQuestions.length}개 / 전체 {importQuestions.length}개
+                    </p>
+                  </div>
+                </div>
+
+                <div className="exam-list">
+                  {importQuestions.map((question, questionIndex) => (
+                    <article className="exam-item" key={`${question.questionNumber}-${questionIndex}`}>
+                      <div style={{ width: '100%' }}>
+                        <div className="panel-header" style={{ padding: 0, borderBottom: 0 }}>
+                          <div>
+                            <strong>문항 {question.questionNumber}</strong>
+                            <p>
+                              <span className={`status-pill status-${question.status}`}>
+                                {importStatusLabels[question.status]}
+                              </span>
+                              {question.reasons.length > 0 ? ` ${question.reasons.join(' / ')}` : ''}
+                            </p>
+                          </div>
+                          <label className="search-field">
+                            <span>포함</span>
+                            <input
+                              checked={question.included}
+                              disabled={question.status === 'invalid' || isCreatingDrafts}
+                              type="checkbox"
+                              onChange={(event) =>
+                                updateImportQuestion(questionIndex, (current) => ({
+                                  ...current,
+                                  included: event.target.checked,
+                                }))
+                              }
+                            />
+                          </label>
+                        </div>
+
+                        <div className="form-grid">
+                          <label>
+                            <span>과목</span>
+                            <input
+                              value={question.subject}
+                              onChange={(event) =>
+                                updateImportQuestion(questionIndex, (current) => ({
+                                  ...current,
+                                  subject: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>분류</span>
+                            <input
+                              value={question.category ?? ''}
+                              onChange={(event) =>
+                                updateImportQuestion(questionIndex, (current) => ({
+                                  ...current,
+                                  category: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                        </div>
+
+                        <label>
+                          <span>문제 본문</span>
+                          <textarea
+                            value={question.content}
+                            onChange={(event) =>
+                              updateImportQuestion(questionIndex, (current) => ({
+                                ...current,
+                                content: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+
+                        <div className="form-grid">
+                          {question.choices.map((choice, choiceIndex) => (
+                            <label key={choiceIndex}>
+                              <span>보기 {choiceIndex + 1}</span>
+                              <input
+                                value={choice}
+                                onChange={(event) =>
+                                  updateImportChoice(questionIndex, choiceIndex, event.target.value)
+                                }
+                              />
+                              {question.choices.length > 2 ? (
+                                <button
+                                  className="text-button"
+                                  type="button"
+                                  onClick={() => removeImportChoice(questionIndex, choiceIndex)}
+                                >
+                                  보기 삭제
+                                </button>
+                              ) : null}
+                            </label>
+                          ))}
+                        </div>
+
+                        <div className="form-actions">
+                          <button
+                            className="secondary-button"
+                            disabled={question.choices.length >= 5}
+                            type="button"
+                            onClick={() => addImportChoice(questionIndex)}
+                          >
+                            보기 추가
+                          </button>
+                          <label className="search-field">
+                            <span>정답</span>
+                            <select
+                              value={question.correctAnswerIndex ?? 0}
+                              onChange={(event) =>
+                                updateImportQuestion(questionIndex, (current) => ({
+                                  ...current,
+                                  correctAnswerIndex: Number(event.target.value),
+                                }))
+                              }
+                            >
+                              {question.choices.map((choice, index) => (
+                                <option key={index} value={index}>
+                                  보기 {index + 1}
+                                  {choice ? ` - ${choice}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                <label>
+                  <input
+                    checked={permissionConfirmed}
+                    disabled={isCreatingDrafts}
+                    type="checkbox"
+                    onChange={(event) => setPermissionConfirmed(event.target.checked)}
+                  />{' '}
+                  업로드한 문제를 사용할 권한이 있음을 확인합니다.
+                </label>
+
+                <div className="form-actions">
+                  <button
+                    className="primary-button"
+                    disabled={isCreatingDrafts || selectedImportQuestions.length === 0}
+                    type="button"
+                    onClick={() => void handleCreatePdfDrafts()}
+                  >
+                    {isCreatingDrafts ? '초안 생성 중...' : `${selectedImportQuestions.length}개 draft 생성`}
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <section className="dashboard-panel">
         <div className="toolbar">
