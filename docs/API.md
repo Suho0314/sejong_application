@@ -1037,14 +1037,14 @@ Response:
 ### PDF 문제 일괄 등록 미리보기
 
 텍스트 기반 문제지 PDF와 정답지 PDF를 업로드해 문제·보기·정답을 추출한다. 원본 PDF는 서버에 영구 저장하지 않는다.
-백엔드는 PDF.js(`pdfjs-dist`)로 페이지별 텍스트 item과 좌표를 읽고, 같은 행의 텍스트를 재구성한 뒤 문항을 파싱한다.
+백엔드는 Poppler `pdftotext -bbox-layout`로 페이지별 단어 좌표를 추출하고, 2단 레이아웃은 좌측 열 전체 → 우측 열 전체 순서로 재구성한 뒤 문항을 파싱한다.
 
 | 항목 | 내용 |
 | --- | --- |
 | Method | `POST` |
 | URL | `/api/admin/questions/pdf-import/preview` |
 | Content-Type | `multipart/form-data` |
-| StatusCode | `200`, `400`, `401`, `403`, `422` |
+| StatusCode | `200`, `400`, `401`, `403`, `422`, `500` |
 
 Form fields:
 
@@ -1092,8 +1092,16 @@ Response:
 - 문항 시작: 줄 시작의 `1.`, `1)`, `문제 1.` 형식을 우선 지원한다.
 - 보기: `①~⑤`, `1)~5)`, `1.~5.` 형식을 지원한다.
 - 여러 페이지와 여러 텍스트 스트림을 페이지 순서대로 분석한다.
+- 2단 레이아웃은 좌표를 기준으로 행을 구성한 뒤 좌우 열을 분리한다.
 - 정답지는 문제번호와 답안 `1~5`를 쌍으로 수집한다.
 - 전체 문서가 하나의 문항으로 합쳐진 것으로 판단되면 문항 경계 실패로 처리한다.
+
+주요 오류 코드:
+
+- `PDF_TEXT_EXTRACTOR_NOT_INSTALLED`: 서버 런타임에 Poppler `pdftotext`가 설치되어 있지 않다.
+- `PDF_TEXT_EXTRACTION_FAILED`: PDF 텍스트 추출에 실패했다.
+- `PDF_QUESTION_PARSE_FAILED`: 문제지에서 문항을 찾지 못했다.
+- `PDF_QUESTION_BOUNDARY_FAILED`: 문항 경계를 안정적으로 분리하지 못했다.
 
 ### PDF 문제 일괄 등록 확정 생성
 

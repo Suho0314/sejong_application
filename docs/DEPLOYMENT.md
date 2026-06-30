@@ -14,11 +14,16 @@ an authorized project member.
 | --- | --- |
 | Deploy Branch | `main` |
 | Root Directory | `backend` |
-| Build Command | `npm ci && npm run build` |
-| Start Command | `npm run start` |
+| Build / Start | `backend/Dockerfile` 자동 감지 사용 |
 
 The server reads Railway's injected `PORT` and listens on `0.0.0.0`. Do not hard-code
 an operating-system port in Railway Variables.
+
+The backend Dockerfile keeps the existing NestJS flow (`npm ci`, `npm run build`,
+`npm run start`) and installs `poppler-utils` so the PDF question import feature can
+execute `pdftotext` in Railway. If Railway is configured with manual build/start
+commands instead of Dockerfile detection, remove those overrides or mirror the Dockerfile
+steps so `poppler-utils` is present at runtime.
 
 ## 2. Configure Railway Variables
 
@@ -84,14 +89,30 @@ may also be configured to use `/api/health` as its service health-check path.
 ## 5. Deployment safety checklist
 
 - The deploy branch is `main`, and the service root is `backend`.
-- Build and start commands match this document exactly.
+- Railway uses `backend/Dockerfile`, or an equivalent runtime image that includes `pdftotext`.
 - `NODE_ENV`, `DATABASE_URL`, `JWT_SECRET`, JWT TTL, and `CORS_ORIGIN` are set in Railway.
 - `PORT` is left to Railway.
 - The actual `.env`, database URL, database password, and JWT secret are not committed.
 - `/api/health` returns `200` from the generated HTTPS domain.
 - Browser frontends are listed explicitly in `CORS_ORIGIN`; wildcard CORS is not used.
 
-## 6. Kakao student login settings
+## 6. PDF question import runtime dependency
+
+The Admin Web PDF question import API extracts text with Poppler `pdftotext` using
+coordinate output. The source PDF is written only to an OS temporary directory during
+the request and is deleted after parsing, regardless of success or failure.
+
+Verify Poppler inside the deployed backend image if PDF preview fails:
+
+```bash
+pdftotext -v
+```
+
+If `pdftotext` is missing, the API returns a clear server error instead of silently
+falling back to broken text extraction. Do not store uploaded original PDFs permanently
+unless a separate storage policy is designed and approved.
+
+## 7. Kakao student login settings
 
 Add these values directly in Railway Variables. Do not commit real Kakao keys.
 

@@ -1,11 +1,19 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { execFile } from 'child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { promisify } from 'util';
 import { ConfirmPdfQuestionDraftDto, ConfirmPdfQuestionImportDto } from './dto/confirm-pdf-question-import.dto';
 import { QuestionsService } from './questions.service';
+
+const execFileAsync = promisify(execFile);
 
 type UploadedPdfFile = {
   buffer: Buffer;
@@ -14,35 +22,24 @@ type UploadedPdfFile = {
   size: number;
 };
 
-type PdfTextItem = {
-  str: string;
-  transform: number[];
-  width?: number;
-  height?: number;
-};
-
 type PdfPageText = {
   pageNumber: number;
   lines: string[];
 };
 
-type PdfDocumentProxy = {
-  numPages: number;
-  getPage(pageNumber: number): Promise<{
-    getTextContent(): Promise<{ items: unknown[] }>;
-  }>;
-  destroy(): Promise<void>;
+type PopplerWord = {
+  text: string;
+  xMin: number;
+  yMin: number;
+  xMax: number;
+  yMax: number;
 };
 
-type PdfJsModule = {
-  getDocument(params: {
-    data: Uint8Array;
-    disableWorker: boolean;
-    useSystemFonts: boolean;
-    cMapPacked: boolean;
-  }): {
-    promise: Promise<PdfDocumentProxy>;
-  };
+type PopplerPage = {
+  pageNumber: number;
+  width: number;
+  height: number;
+  words: PopplerWord[];
 };
 
 export type PdfImportPreviewStatus = 'ready' | 'needs_review' | 'invalid';
@@ -241,87 +238,260 @@ export class QuestionPdfImportService {
   }
 
   private async extractPdfPages(buffer: Buffer): Promise<PdfPageText[]> {
-    const pdfjs = await this.loadPdfJs();
-    const loadingTask = pdfjs.getDocument({
-      data: new Uint8Array(buffer),
-      disableWorker: true,
-      useSystemFonts: true,
-      cMapPacked: true,
-    });
-    const document = await loadingTask.promise;
+    const tempDir = await mkdtemp(join(tmpdir(), 'sejong-pdf-import-'));
+    const inputPath = join(tempDir, 'upload.pdf');
+    const outputPath = join(tempDir, 'layout.html');
 
     try {
-      const pages: PdfPageText[] = [];
+      await writeFile(inputPath, buffer);
+      await execFileAsync('pdftotext', ['-bbox-layout', '-enc', 'UTF-8', inputPath, outputPath], {
+        timeout: 30000,
+        maxBuffer: 20 * 1024 * 1024,
+      });
 
-      for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-        const page = await document.getPage(pageNumber);
-        const textContent = await page.getTextContent();
-        const items = textContent.items.filter(this.isPdfTextItem);
-        const lines = this.rebuildLinesFromTextItems(items);
+      const layoutHtml = await readFile(outputPath, 'utf8');
+      const pages = this.parsePopplerBboxLayout(layoutHtml).map((page) => ({
+        pageNumber: page.pageNumber,
+        lines: this.rebuildLinesFromPopplerWords(page),
+      }));
 
-        pages.push({ pageNumber, lines });
+      return pages;
+    } catch (error) {
+      if (this.isKnownHttpException(error)) {
+        throw error;
       }
 
-      if (pages.every((page) => page.lines.length === 0)) {
-        throw new UnprocessableEntityException({
+      const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
+
+      if (code === 'ENOENT') {
+        throw new InternalServerErrorException({
           error: {
-            code: 'PDF_TEXT_EXTRACTION_FAILED',
-            message: 'PDF에서 텍스트를 추출하지 못했습니다. 텍스트 기반 PDF인지 확인해주세요.',
+            code: 'PDF_TEXT_EXTRACTOR_NOT_INSTALLED',
+            message: '서버에 pdftotext(Poppler)가 설치되어 있지 않습니다. 배포 환경에 poppler-utils를 설치해주세요.',
             details: [],
           },
         });
       }
 
-      return pages;
+      throw new UnprocessableEntityException({
+        error: {
+          code: 'PDF_TEXT_EXTRACTION_FAILED',
+          message: 'PDF 텍스트 추출에 실패했습니다. 텍스트 기반 PDF인지 확인해주세요.',
+          details: [],
+        },
+      });
     } finally {
-      await document.destroy();
+      await rm(tempDir, { recursive: true, force: true });
     }
   }
 
-  private async loadPdfJs(): Promise<PdfJsModule> {
-    return import('pdfjs-dist/legacy/build/pdf.js') as Promise<PdfJsModule>;
+  private parsePopplerBboxLayout(layoutHtml: string): PopplerPage[] {
+    const pages: PopplerPage[] = [];
+    const pagePattern = /<page\b([^>]*)>([\s\S]*?)<\/page>/gi;
+    let pageMatch: RegExpExecArray | null;
+
+    while ((pageMatch = pagePattern.exec(layoutHtml)) !== null) {
+      const attributes = pageMatch[1];
+      const pageBody = pageMatch[2];
+      const pageNumber = pages.length + 1;
+      const width = this.parseNumberAttribute(attributes, 'width') ?? 0;
+      const height = this.parseNumberAttribute(attributes, 'height') ?? 0;
+      const words = this.parsePopplerWords(pageBody);
+
+      pages.push({ pageNumber, width, height, words });
+    }
+
+    if (pages.length === 0 || pages.every((page) => page.words.length === 0)) {
+      throw new UnprocessableEntityException({
+        error: {
+          code: 'PDF_TEXT_EXTRACTION_FAILED',
+          message: 'PDF에서 텍스트를 추출하지 못했습니다. 텍스트 기반 PDF인지 확인해주세요.',
+          details: [],
+        },
+      });
+    }
+
+    return pages;
   }
 
-  private isPdfTextItem(item: unknown): item is PdfTextItem {
-    if (!item || typeof item !== 'object') return false;
+  private parsePopplerWords(pageBody: string): PopplerWord[] {
+    const words: PopplerWord[] = [];
+    const wordPattern = /<word\b([^>]*)>([\s\S]*?)<\/word>/gi;
+    let match: RegExpExecArray | null;
 
-    const maybeTextItem = item as Partial<PdfTextItem>;
-    return typeof maybeTextItem.str === 'string' && Array.isArray(maybeTextItem.transform);
+    while ((match = wordPattern.exec(pageBody)) !== null) {
+      const attributes = match[1];
+      const text = this.normalizePdfText(this.decodeXmlEntities(match[2]));
+      const xMin = this.parseNumberAttribute(attributes, 'xMin');
+      const yMin = this.parseNumberAttribute(attributes, 'yMin');
+      const xMax = this.parseNumberAttribute(attributes, 'xMax');
+      const yMax = this.parseNumberAttribute(attributes, 'yMax');
+
+      if (!text || xMin === null || yMin === null || xMax === null || yMax === null) continue;
+
+      words.push({ text, xMin, yMin, xMax, yMax });
+    }
+
+    return words;
   }
 
-  private rebuildLinesFromTextItems(items: PdfTextItem[]): string[] {
-    const rows: Array<{ y: number; items: Array<{ x: number; text: string }> }> = [];
+  private parseNumberAttribute(attributes: string, name: string): number | null {
+    const match = attributes.match(new RegExp(`${name}="([^"]+)"`, 'i'));
+
+    if (!match) return null;
+
+    const value = Number(match[1]);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  private decodeXmlEntities(value: string): string {
+    return value
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+      .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCodePoint(Number.parseInt(code, 16)))
+      .replace(/&amp;/g, '&');
+  }
+
+  private rebuildLinesFromPopplerWords(page: PopplerPage): string[] {
+    const rows = this.groupWordsIntoRows(page.words);
+    const singleColumnLines = this.rowsToSingleColumnLines(rows, page);
+    const twoColumnLines = this.rowsToTwoColumnLines(rows, page);
+    const twoColumnQuestionStarts = this.countQuestionStartCandidates([{ pageNumber: page.pageNumber, lines: twoColumnLines }]);
+    const singleColumnQuestionStarts = this.countQuestionStartCandidates([
+      { pageNumber: page.pageNumber, lines: singleColumnLines },
+    ]);
+
+    if (
+      twoColumnLines.length >= 6 &&
+      twoColumnQuestionStarts >= Math.max(2, singleColumnQuestionStarts) &&
+      this.hasBalancedColumns(rows, page)
+    ) {
+      return twoColumnLines;
+    }
+
+    return singleColumnLines;
+  }
+
+  private groupWordsIntoRows(words: PopplerWord[]): Array<{ y: number; yMin: number; yMax: number; words: PopplerWord[] }> {
+    const rows: Array<{ y: number; yMin: number; yMax: number; words: PopplerWord[] }> = [];
+    const sortedWords = [...words].sort((left, right) => left.yMin - right.yMin || left.xMin - right.xMin);
     const yTolerance = 4;
 
-    for (const item of items) {
-      const text = this.normalizePdfText(item.str);
-
-      if (!text) continue;
-
-      const x = Number(item.transform[4] ?? 0);
-      const y = Number(item.transform[5] ?? 0);
-      let row = rows.find((candidate) => Math.abs(candidate.y - y) <= yTolerance);
+    for (const word of sortedWords) {
+      const centerY = (word.yMin + word.yMax) / 2;
+      let row = rows.find((candidate) => Math.abs(candidate.y - centerY) <= yTolerance);
 
       if (!row) {
-        row = { y, items: [] };
+        row = { y: centerY, yMin: word.yMin, yMax: word.yMax, words: [] };
         rows.push(row);
       }
 
-      row.items.push({ x, text });
+      row.y = (row.y * row.words.length + centerY) / (row.words.length + 1);
+      row.yMin = Math.min(row.yMin, word.yMin);
+      row.yMax = Math.max(row.yMax, word.yMax);
+      row.words.push(word);
     }
 
+    return rows.sort((left, right) => left.y - right.y);
+  }
+
+  private rowsToSingleColumnLines(
+    rows: Array<{ y: number; yMin: number; yMax: number; words: PopplerWord[] }>,
+    page: PopplerPage,
+  ): string[] {
     return rows
-      .sort((left, right) => right.y - left.y)
-      .flatMap((row) =>
-        this.expandLogicalLines(
-          row.items
-            .sort((left, right) => left.x - right.x)
-            .map((item) => item.text)
-            .join(' '),
-        ),
-      )
+      .map((row) => ({ ...row, text: this.wordsToLine(row.words) }))
+      .filter((row) => !this.isHeaderFooterLine(row.text, page, row.yMin, row.yMax))
+      .flatMap((row) => this.expandLogicalLines(row.text))
       .map((line) => line.trim())
       .filter(Boolean);
+  }
+
+  private rowsToTwoColumnLines(
+    rows: Array<{ y: number; yMin: number; yMax: number; words: PopplerWord[] }>,
+    page: PopplerPage,
+  ): string[] {
+    const midpoint = page.width > 0 ? page.width / 2 : this.estimateMidpoint(rows);
+    const leftLines: Array<{ y: number; text: string }> = [];
+    const rightLines: Array<{ y: number; text: string }> = [];
+
+    for (const row of rows) {
+      const leftWords = row.words.filter((word) => (word.xMin + word.xMax) / 2 < midpoint);
+      const rightWords = row.words.filter((word) => (word.xMin + word.xMax) / 2 >= midpoint);
+      const leftText = this.wordsToLine(leftWords);
+      const rightText = this.wordsToLine(rightWords);
+
+      if (leftText && !this.isHeaderFooterLine(leftText, page, row.yMin, row.yMax)) {
+        leftLines.push({ y: row.y, text: leftText });
+      }
+
+      if (rightText && !this.isHeaderFooterLine(rightText, page, row.yMin, row.yMax)) {
+        rightLines.push({ y: row.y, text: rightText });
+      }
+    }
+
+    return [...leftLines.sort((left, right) => left.y - right.y), ...rightLines.sort((left, right) => left.y - right.y)]
+      .flatMap((line) => this.expandLogicalLines(line.text))
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+
+  private wordsToLine(words: PopplerWord[]): string {
+    return words
+      .sort((left, right) => left.xMin - right.xMin)
+      .map((word) => word.text)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private estimateMidpoint(rows: Array<{ words: PopplerWord[] }>): number {
+    const centers = rows
+      .flatMap((row) => row.words)
+      .map((word) => (word.xMin + word.xMax) / 2)
+      .sort((left, right) => left - right);
+
+    if (centers.length === 0) return 0;
+
+    return centers[Math.floor(centers.length / 2)];
+  }
+
+  private hasBalancedColumns(rows: Array<{ words: PopplerWord[] }>, page: PopplerPage): boolean {
+    const midpoint = page.width > 0 ? page.width / 2 : this.estimateMidpoint(rows);
+    let leftRows = 0;
+    let rightRows = 0;
+
+    for (const row of rows) {
+      if (row.words.some((word) => (word.xMin + word.xMax) / 2 < midpoint)) leftRows += 1;
+      if (row.words.some((word) => (word.xMin + word.xMax) / 2 >= midpoint)) rightRows += 1;
+    }
+
+    return leftRows >= 4 && rightRows >= 4 && Math.min(leftRows, rightRows) / Math.max(leftRows, rightRows) >= 0.25;
+  }
+
+  private isHeaderFooterLine(text: string, page: PopplerPage, yMin: number, yMax: number): boolean {
+    const normalized = text.trim();
+
+    if (!normalized) return true;
+
+    const nearTop = page.height > 0 && yMin < page.height * 0.06;
+    const nearBottom = page.height > 0 && yMax > page.height * 0.94;
+
+    if ((nearTop || nearBottom) && /^-?\s*\d+\s*-?$/.test(normalized)) return true;
+    if ((nearTop || nearBottom) && /^(?:페이지|page)\s*\d+/i.test(normalized)) return true;
+
+    return false;
+  }
+
+  private isKnownHttpException(error: unknown): boolean {
+    return (
+      error instanceof BadRequestException ||
+      error instanceof InternalServerErrorException ||
+      error instanceof UnprocessableEntityException
+    );
   }
 
   private normalizePdfText(text: string): string {
@@ -433,7 +603,7 @@ export class QuestionPdfImportService {
     line: string,
     currentQuestion: ParsedQuestion | null,
   ): { questionNumber: number; content: string } | null {
-    const match = line.match(/^(?:문제\s*)?(\d{1,3})[\).．]\s*(.+)$/);
+    const match = line.match(/^(?:문제\s*)?(\d{1,3})[\).．]\s*(.*)$/);
 
     if (!match) return null;
 
@@ -459,7 +629,7 @@ export class QuestionPdfImportService {
       return { index: circled, text: line.slice(1).trim() };
     }
 
-    const numbered = line.match(/^([1-5])[\).．]\s+(.+)$/);
+    const numbered = line.match(/^([1-5])[\).．]\s*(.+)$/);
 
     if (!numbered) return null;
 
@@ -491,6 +661,19 @@ export class QuestionPdfImportService {
       while ((match = explicitPattern.exec(normalized)) !== null) {
         answers.set(Number(match[1]), Number(match[2]));
       }
+
+      const numericTokens = normalized.match(/\d{1,3}/g)?.map(Number) ?? [];
+
+      if (numericTokens.length >= 2) {
+        for (let index = 0; index < numericTokens.length - 1; index += 2) {
+          const questionNumber = numericTokens[index];
+          const answerNumber = numericTokens[index + 1];
+
+          if (questionNumber >= 1 && questionNumber <= 300 && answerNumber >= 1 && answerNumber <= 5) {
+            answers.set(questionNumber, answerNumber);
+          }
+        }
+      }
     }
 
     return answers;
@@ -503,7 +686,7 @@ export class QuestionPdfImportService {
   private countQuestionStartCandidates(pages: PdfPageText[]): number {
     return pages
       .flatMap((page) => page.lines)
-      .filter((line) => /^(?:문제\s*)?\d{1,3}[\).．]\s+/.test(line))
+      .filter((line) => /^(?:문제\s*)?\d{1,3}[\).．](?:\s+|$)/.test(line))
       .length;
   }
 
