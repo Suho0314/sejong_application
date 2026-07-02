@@ -52,7 +52,6 @@ export function CohortForm({ disabled = false, initialValues, mode, onCancel, on
             disabled={disabled}
             value={values.name}
             onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
-            placeholder="예: 2026년 1기"
           />
         </label>
         <label>
@@ -62,7 +61,6 @@ export function CohortForm({ disabled = false, initialValues, mode, onCancel, on
             disabled={disabled}
             value={values.code}
             onChange={(event) => setValues((current) => ({ ...current, code: event.target.value }))}
-            placeholder="예: 2026-01"
           />
         </label>
         <label>
@@ -117,7 +115,6 @@ export function CohortForm({ disabled = false, initialValues, mode, onCancel, on
           disabled={disabled}
           value={values.description}
           onChange={(event) => setValues((current) => ({ ...current, description: event.target.value }))}
-          placeholder="기수 설명을 입력하세요."
         />
       </label>
       <div className="form-actions">

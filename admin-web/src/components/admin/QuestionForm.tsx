@@ -98,7 +98,6 @@ export function QuestionForm({ disabled = false, initialValues, mode, onCancel, 
           disabled={disabled}
           value={values.content}
           onChange={(event) => setValues((current) => ({ ...current, content: event.target.value }))}
-          placeholder="학생에게 보여질 실제 문제 내용을 입력하세요."
         />
       </label>
 
@@ -110,7 +109,6 @@ export function QuestionForm({ disabled = false, initialValues, mode, onCancel, 
             disabled={disabled}
             value={values.subject}
             onChange={(event) => setValues((current) => ({ ...current, subject: event.target.value }))}
-            placeholder="예: 기본간호학"
           />
         </label>
         <label>
@@ -119,7 +117,6 @@ export function QuestionForm({ disabled = false, initialValues, mode, onCancel, 
             disabled={disabled}
             value={values.category}
             onChange={(event) => setValues((current) => ({ ...current, category: event.target.value }))}
-            placeholder="예: 활력징후"
           />
         </label>
         <label>
@@ -145,7 +142,6 @@ export function QuestionForm({ disabled = false, initialValues, mode, onCancel, 
               disabled={disabled}
               value={choice}
               onChange={(event) => handleChoiceChange(index, event.target.value)}
-              placeholder={`보기 ${index + 1}`}
             />
             {values.choices.length > MIN_CHOICE_COUNT ? (
               <button

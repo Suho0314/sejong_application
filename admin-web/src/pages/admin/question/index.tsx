@@ -746,7 +746,6 @@ export function QuestionPage() {
             <input
               value={keyword}
               onChange={(event) => handleKeywordChange(event.target.value)}
-              placeholder="문제 내용, 과목, 카테고리, 난이도, 상태 검색"
             />
           </label>
           <label className="search-field">
@@ -840,7 +839,6 @@ export function QuestionPage() {
               disabled={selectedQuestionCount === 0 || isBulkCategoryUpdating}
               value={bulkCategory}
               onChange={(event) => setBulkCategory(event.target.value)}
-              placeholder="예: 기초간호학"
             />
           </label>
           <button

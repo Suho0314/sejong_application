@@ -285,7 +285,6 @@ export function StudentPage() {
             <input
               value={keyword}
               onChange={(event) => handleKeywordChange(event.target.value)}
-              placeholder="이름, 이메일, 연락처, 학번 검색"
             />
           </label>
           <label className="search-field">

@@ -50,7 +50,6 @@ export function WorkbookForm({ disabled = false, initialValues, mode, onCancel, 
             disabled={disabled}
             value={values.title}
             onChange={(event) => setValues((current) => ({ ...current, title: event.target.value }))}
-            placeholder="예: 기본간호학 핵심 문제집"
             required
           />
         </label>
@@ -93,7 +92,6 @@ export function WorkbookForm({ disabled = false, initialValues, mode, onCancel, 
             disabled={disabled}
             value={values.description}
             onChange={(event) => setValues((current) => ({ ...current, description: event.target.value }))}
-            placeholder="문제집 목적과 풀이 안내를 입력하세요."
             rows={3}
           />
         </label>
