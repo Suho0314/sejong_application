@@ -36,3 +36,18 @@ export type KakaoStudentRow = {
   cohort_id: string | null;
   student_status: StudentApprovalStatus;
 };
+
+
+export type TeacherAccountRow = {
+  id: string;
+  login_id: string;
+  name: string;
+  email: string | null;
+  role: 'teacher';
+  status: 'active' | 'inactive';
+  teacher_id: string;
+  phone: string | null;
+  department: string | null;
+  created_at: Date;
+  updated_at: Date;
+};

@@ -17,6 +17,8 @@ export type AdminSession = {
   loggedInAt: string;
 };
 
+export type AdminSessionUser = Omit<AdminSession, 'accessToken' | 'loggedInAt'>;
+
 type TeacherLoginResponse = {
   data: {
     accessToken: string;
@@ -117,6 +119,21 @@ export const getAdminSession = (): AdminSession | null => {
 export const getAccessToken = () => localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
 
 export const isAdminAuthenticated = () => Boolean(getAccessToken() && getAdminSession());
+
+export const syncAdminSessionUser = (user: AdminSessionUser) => {
+  const session = getAdminSession();
+
+  if (!session) return;
+
+  localStorage.setItem(
+    AUTH_STORAGE_KEY,
+    JSON.stringify({
+      ...session,
+      ...user,
+    }),
+  );
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+};
 
 export const logoutAdmin = () => {
   localStorage.removeItem(AUTH_STORAGE_KEY);

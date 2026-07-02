@@ -139,6 +139,122 @@ Response:
 }
 ```
 
+### 강사용 계정 정보 조회
+
+현재 로그인한 강사 본인의 계정 정보를 조회한다. JWT 인증과 `teacher` 역할이 필요하다.
+
+| 항목 | 내용 |
+| --- | --- |
+| Method | `GET` |
+| URL | `/api/auth/teacher/me` |
+| StatusCode | `200`, `401`, `403` |
+
+Response:
+
+```json
+{
+  "data": {
+    "id": "user-uuid",
+    "role": "teacher",
+    "name": "강사명",
+    "loginId": "teacher1",
+    "email": "teacher@example.com",
+    "teacherId": "teacher-uuid",
+    "phone": "010-2000-0001",
+    "department": "기본간호학",
+    "status": "active",
+    "createdAt": "2026-01-05T00:00:00.000Z",
+    "updatedAt": "2026-06-01T00:00:00.000Z"
+  }
+}
+```
+
+### 강사용 계정 정보 수정
+
+현재 로그인한 강사 본인의 일반 계정 정보를 수정한다. 다른 사용자 ID를 요청으로 받아 수정하지 않는다. `role`, `authProvider`, `providerUserId`, `deletedAt` 등 인증·권한 필드는 수정할 수 없다.
+
+| 항목 | 내용 |
+| --- | --- |
+| Method | `PATCH` |
+| URL | `/api/auth/teacher/me` |
+| StatusCode | `200`, `400`, `401`, `403`, `409` |
+
+Request:
+
+```json
+{
+  "loginId": "teacher1",
+  "name": "강사명",
+  "email": "teacher@example.com",
+  "phone": "010-2000-0001"
+}
+```
+
+정책:
+
+- `loginId`, `name`은 필수이다.
+- `email`, `phone`은 빈 문자열 또는 공백만 전달하면 `null`로 저장한다.
+- `loginId`, `email`은 soft delete되지 않은 다른 사용자와 중복될 수 없다.
+- `users`와 `teachers` 갱신은 트랜잭션으로 처리한다.
+
+Response:
+
+```json
+{
+  "data": {
+    "id": "user-uuid",
+    "role": "teacher",
+    "name": "강사명",
+    "loginId": "teacher1",
+    "email": "teacher@example.com",
+    "teacherId": "teacher-uuid",
+    "phone": "010-2000-0001",
+    "department": "기본간호학",
+    "status": "active",
+    "createdAt": "2026-01-05T00:00:00.000Z",
+    "updatedAt": "2026-07-02T00:00:00.000Z"
+  }
+}
+```
+
+### 강사용 비밀번호 변경
+
+현재 로그인한 강사 본인의 비밀번호를 변경한다. 평문 비밀번호는 저장하거나 응답하지 않는다.
+
+| 항목 | 내용 |
+| --- | --- |
+| Method | `PATCH` |
+| URL | `/api/auth/teacher/password` |
+| StatusCode | `200`, `400`, `401`, `403` |
+
+Request:
+
+```json
+{
+  "currentPassword": "current-password",
+  "nextPassword": "new-password",
+  "confirmPassword": "new-password"
+}
+```
+
+정책:
+
+- 현재 비밀번호가 일치해야 한다.
+- 새 비밀번호는 8자 이상이어야 한다.
+- 새 비밀번호와 확인 값이 일치해야 한다.
+- 새 비밀번호는 현재 비밀번호와 달라야 한다.
+- 저장 시 bcrypt hash로 갱신한다.
+
+Response:
+
+```json
+{
+  "data": {
+    "changed": true
+  }
+}
+```
+
 ### 학생 카카오 인가 URL 발급
 
 | 항목 | 내용 |

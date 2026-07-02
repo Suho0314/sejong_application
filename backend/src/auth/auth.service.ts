@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
@@ -9,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { DatabaseService } from '../database/database.service';
 import { LoginDto } from './dto/login.dto';
+import { ChangeTeacherPasswordDto, UpdateTeacherAccountDto } from './dto/account-settings.dto';
 import {
   AccessTokenPayload,
   KakaoStudentRow,
@@ -16,6 +18,7 @@ import {
   LoginRole,
   LoginUserRow,
   StudentApprovalStatus,
+  TeacherAccountRow,
 } from './auth.types';
 
 const INVALID_CREDENTIALS_RESPONSE = {
@@ -105,6 +108,158 @@ export class AuthService {
     };
   }
 
+
+
+  async getTeacherAccount(userId?: string) {
+    const account = await this.findActiveTeacherAccount(userId);
+
+    return {
+      data: this.toTeacherAccountResponse(account),
+    };
+  }
+
+  async updateTeacherAccount(userId: string | undefined, body: UpdateTeacherAccountDto) {
+    const current = await this.findActiveTeacherAccount(userId);
+    const pool = this.databaseService.getPool();
+    const client = await pool.connect();
+    const email = normalizeOptionalString(body.email);
+    const phone = normalizeOptionalString(body.phone);
+
+    try {
+      await client.query('BEGIN');
+
+      const duplicateLoginId = await client.query<{ id: string }>(
+        `SELECT id
+         FROM users
+         WHERE login_id = $1
+           AND id <> $2
+           AND deleted_at IS NULL
+         LIMIT 1`,
+        [body.loginId, current.id],
+      );
+
+      if (duplicateLoginId.rows.length > 0) {
+        throw new ConflictException({
+          error: {
+            code: 'LOGIN_ID_ALREADY_EXISTS',
+            message: '이미 사용 중인 ID입니다.',
+            details: [],
+          },
+        });
+      }
+
+      if (email) {
+        const duplicateEmail = await client.query<{ id: string }>(
+          `SELECT id
+           FROM users
+           WHERE LOWER(email) = LOWER($1)
+             AND id <> $2
+             AND deleted_at IS NULL
+           LIMIT 1`,
+          [email, current.id],
+        );
+
+        if (duplicateEmail.rows.length > 0) {
+          throw new ConflictException({
+            error: {
+              code: 'EMAIL_ALREADY_EXISTS',
+              message: '이미 사용 중인 이메일입니다.',
+              details: [],
+            },
+          });
+        }
+      }
+
+      await client.query(
+        `UPDATE users
+         SET login_id = $2,
+             name = $3,
+             email = $4,
+             updated_at = now()
+         WHERE id = $1
+           AND role = 'teacher'
+           AND status = 'active'
+           AND deleted_at IS NULL`,
+        [current.id, body.loginId, body.name, email],
+      );
+      await client.query(
+        `UPDATE teachers
+         SET phone = $2,
+             updated_at = now()
+         WHERE id = $1
+           AND deleted_at IS NULL`,
+        [current.teacher_id, phone],
+      );
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    const updated = await this.findActiveTeacherAccount(userId);
+
+    return {
+      data: this.toTeacherAccountResponse(updated),
+    };
+  }
+
+  async changeTeacherPassword(userId: string | undefined, body: ChangeTeacherPasswordDto) {
+    const account = await this.findActiveTeacherAccountWithPassword(userId);
+    const passwordMatches = await bcrypt.compare(body.currentPassword, account.password_hash);
+
+    if (!passwordMatches) {
+      throw new UnauthorizedException({
+        error: {
+          code: 'CURRENT_PASSWORD_MISMATCH',
+          message: '현재 비밀번호가 일치하지 않습니다.',
+          details: [],
+        },
+      });
+    }
+
+    if (body.nextPassword !== body.confirmPassword) {
+      throw new BadRequestException({
+        error: {
+          code: 'PASSWORD_CONFIRM_MISMATCH',
+          message: '새 비밀번호 확인이 일치하지 않습니다.',
+          details: [],
+        },
+      });
+    }
+
+    if (body.currentPassword === body.nextPassword) {
+      throw new BadRequestException({
+        error: {
+          code: 'PASSWORD_NOT_CHANGED',
+          message: '새 비밀번호는 현재 비밀번호와 달라야 합니다.',
+          details: [],
+        },
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(body.nextPassword, 10);
+
+    await this.databaseService.getPool().query(
+      `UPDATE users
+       SET password_hash = $2,
+           updated_at = now()
+       WHERE id = $1
+         AND role = 'teacher'
+         AND status = 'active'
+         AND deleted_at IS NULL`,
+      [account.id, passwordHash],
+    );
+
+    return {
+      data: {
+        changed: true,
+      },
+    };
+  }
+
   getKakaoAuthorizeUrl(redirectUri: string, state: string) {
     this.assertAllowedKakaoRedirectUri(redirectUri);
     this.assertValidOAuthState(state);
@@ -166,6 +321,77 @@ export class AuthService {
           cohortId: student.cohort_id,
         },
       },
+    };
+  }
+
+
+
+  private async findActiveTeacherAccount(userId?: string): Promise<TeacherAccountRow> {
+    const account = await this.findActiveTeacherAccountRow(userId, false);
+    return account as TeacherAccountRow;
+  }
+
+  private async findActiveTeacherAccountWithPassword(userId?: string): Promise<TeacherAccountRow & { password_hash: string }> {
+    const account = await this.findActiveTeacherAccountRow(userId, true);
+    return account as TeacherAccountRow & { password_hash: string };
+  }
+
+  private async findActiveTeacherAccountRow(
+    userId: string | undefined,
+    includePasswordHash: boolean,
+  ): Promise<TeacherAccountRow | (TeacherAccountRow & { password_hash: string })> {
+    if (!userId) {
+      this.throwInvalidCredentials();
+    }
+
+    const passwordColumn = includePasswordHash ? ', users.password_hash' : '';
+    const result = await this.databaseService.getPool().query<TeacherAccountRow & { password_hash?: string }>(
+      `SELECT
+         users.id,
+         users.login_id,
+         users.name,
+         users.email,
+         users.role,
+         users.status,
+         teachers.id AS teacher_id,
+         teachers.phone,
+         teachers.department,
+         users.created_at,
+         users.updated_at
+         ${passwordColumn}
+       FROM users
+       JOIN teachers
+         ON teachers.user_id = users.id
+        AND teachers.deleted_at IS NULL
+       WHERE users.id = $1
+         AND users.role = 'teacher'
+         AND users.status = 'active'
+         AND users.deleted_at IS NULL
+       LIMIT 1`,
+      [userId],
+    );
+    const account = result.rows[0];
+
+    if (!account) {
+      this.throwInvalidCredentials();
+    }
+
+    return account;
+  }
+
+  private toTeacherAccountResponse(account: TeacherAccountRow) {
+    return {
+      id: account.id,
+      role: account.role,
+      name: account.name,
+      loginId: account.login_id,
+      email: account.email,
+      teacherId: account.teacher_id,
+      phone: account.phone,
+      department: account.department,
+      status: account.status,
+      createdAt: account.created_at,
+      updatedAt: account.updated_at,
     };
   }
 
