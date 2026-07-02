@@ -126,9 +126,9 @@ export function LoginPage() {
       <section className="dashboard-panel" style={loginPanelStyle}>
         <div className="panel-header">
           <div>
-            <img className="login-brand-logo" src="/sgne-logo.png" alt="세종고은간호전문학원 로고" />
+            <img className="login-brand-logo" src="/sgne-logo.png" alt="세종고운간호전문학원 로고" />
             <p className="eyebrow">Admin Login</p>
-            <h2>세종고은간호전문학원</h2>
+            <h2>세종고운간호전문학원</h2>
             <p>강사용 관리 시스템에 로그인하세요.</p>
           </div>
         </div>

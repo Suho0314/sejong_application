@@ -24,9 +24,9 @@ export function AdminLayout() {
     <div className="admin-layout">
       <aside>
         <div className="sidebar-brand">
-          <img src="/sgne-logo.png" alt="세종고은간호전문학원 로고" />
+          <img src="/sgne-logo.png" alt="세종고운간호전문학원 로고" />
           <div>
-            <strong>세종고은간호전문학원</strong>
+            <strong>세종고운간호전문학원</strong>
             <span>Sejong Admin</span>
           </div>
         </div>

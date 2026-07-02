@@ -224,7 +224,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
 
         <View style={styles.header}>
           <Text style={styles.kicker}>NURSING ACADEMY</Text>
-          <Text style={styles.title}>세종고은간호전문학원</Text>
+          <Text style={styles.title}>세종고운간호전문학원</Text>
           <Text style={styles.description}>카카오 로그인 후 강사 승인이 완료되면 문제집을 풀이할 수 있습니다.</Text>
         </View>
 
