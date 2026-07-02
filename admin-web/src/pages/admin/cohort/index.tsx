@@ -179,7 +179,6 @@ export function CohortPage() {
             <input
               value={keyword}
               onChange={(event) => handleSearchChange(event.target.value)}
-              placeholder="기수명, 코드 검색"
             />
           </label>
           <button className="secondary-button" type="button" onClick={() => handleSearchChange('')}>

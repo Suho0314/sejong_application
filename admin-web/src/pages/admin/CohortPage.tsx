@@ -132,7 +132,6 @@ export function CohortPage() {
             <input
               value={keyword}
               onChange={(event) => handleKeywordChange(event.target.value)}
-              placeholder="기수명, 코드, 설명, 상태 검색"
             />
           </label>
           <button className="secondary-button" type="button" onClick={() => handleKeywordChange('')}>

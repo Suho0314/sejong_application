@@ -136,14 +136,13 @@ export function LoginPage() {
         <form className="cohort-form" onSubmit={handleLogin}>
           <label>
             <span>ID 또는 Email</span>
-            <input value={id} onChange={(event) => setId(event.target.value)} placeholder="teacher1" required />
+            <input value={id} onChange={(event) => setId(event.target.value)} required />
           </label>
           <label>
             <span>Password</span>
             <input
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="teacher-1234"
               required
               type="password"
             />
@@ -182,7 +181,6 @@ export function LoginPage() {
                 <input
                   value={securityAnswer}
                   onChange={(event) => setSecurityAnswer(event.target.value)}
-                  placeholder="보안 질문 답변을 입력하세요."
                   required
                 />
               </label>

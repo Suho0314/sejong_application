@@ -508,7 +508,6 @@ export function WorkbookPage() {
             <input
               value={workbookKeyword}
               onChange={(event) => handleWorkbookKeywordChange(event.target.value)}
-              placeholder="문제집명, 설명 검색"
             />
           </label>
           <label className="search-field">
@@ -557,7 +556,6 @@ export function WorkbookPage() {
               <input
                 value={questionKeyword}
                 onChange={(event) => handleQuestionKeywordChange(event.target.value)}
-                placeholder="문제 내용, 과목, 카테고리 검색"
               />
             </label>
             <label className="search-field">

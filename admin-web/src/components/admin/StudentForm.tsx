@@ -59,7 +59,6 @@ export function StudentForm({ cohorts, disabled = false, initialValues, mode, on
             disabled={disabled}
             value={values.name}
             onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
-            placeholder="학생 이름"
           />
         </label>
         <label>
@@ -69,7 +68,6 @@ export function StudentForm({ cohorts, disabled = false, initialValues, mode, on
             type="email"
             value={values.email}
             onChange={(event) => setValues((current) => ({ ...current, email: event.target.value }))}
-            placeholder="student@example.com"
           />
         </label>
         <label>
@@ -78,7 +76,6 @@ export function StudentForm({ cohorts, disabled = false, initialValues, mode, on
             disabled={disabled}
             value={values.phone}
             onChange={(event) => setValues((current) => ({ ...current, phone: event.target.value }))}
-            placeholder="010-0000-0000"
           />
         </label>
         <label>
@@ -87,7 +84,6 @@ export function StudentForm({ cohorts, disabled = false, initialValues, mode, on
             disabled={disabled}
             value={values.studentNo}
             onChange={(event) => setValues((current) => ({ ...current, studentNo: event.target.value }))}
-            placeholder="S-2026-001"
           />
         </label>
         <label>
