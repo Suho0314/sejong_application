@@ -104,6 +104,22 @@ export class QuestionsService {
     };
   }
 
+  async listCategories() {
+    const result = await this.databaseService.getPool().query<{ category: string }>(
+      `SELECT DISTINCT btrim(category) AS category
+       FROM questions
+       WHERE deleted_at IS NULL
+         AND category IS NOT NULL
+         AND btrim(category) <> ''`,
+    );
+
+    return {
+      data: result.rows
+        .map((row) => row.category)
+        .sort((left, right) => left.localeCompare(right, 'ko-KR')),
+    };
+  }
+
   async getQuestion(questionId: string) {
     const question = await this.findQuestionById(questionId);
     const choices = await this.getChoices(questionId);

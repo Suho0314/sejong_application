@@ -853,7 +853,10 @@ Response:
 
 Query parameters: `type`, `difficulty`, `subject`, `category`, `status`, `keyword`, `page`, `limit`
 
-Example: `GET /api/admin/questions?type=multiple_choice&difficulty=medium&subject=기본간호학&page=1&limit=20`
+- `category`는 앞뒤 공백을 제거한 뒤 `questions.category`와 정확히 일치하는 문제만 조회한다.
+- `keyword`, `status`, `subject`, `difficulty`, `type`, `page`, `limit`과 함께 조합해 사용할 수 있다.
+
+Example: `GET /api/admin/questions?type=multiple_choice&difficulty=medium&subject=기본간호학&category=활력징후&page=1&limit=20`
 
 Response:
 
@@ -885,6 +888,39 @@ Response:
   }
 }
 ```
+
+### 문제 카테고리 목록 조회
+
+문제은행 필터에 사용할 실제 카테고리 목록을 조회한다. 문제 데이터는 수정하지 않는다.
+
+| 항목 | 내용 |
+| --- | --- |
+| Method | `GET` |
+| URL | `/api/admin/questions/categories` |
+| StatusCode | `200`, `401`, `403` |
+
+Query parameters: 없음
+
+Response:
+
+```json
+{
+  "data": [
+    "기초간호학",
+    "보건간호학",
+    "공중보건학",
+    "실기"
+  ]
+}
+```
+
+조회 기준:
+
+- `deleted_at IS NULL` 문제만 기준으로 한다.
+- `category`가 `NULL`, 빈 문자열, 공백만 있는 문제는 목록에서 제외한다.
+- 카테고리는 앞뒤 공백을 제거한 값으로 중복 제거한다.
+- 응답 배열은 한글 가나다순으로 정렬한다.
+- 카테고리가 없는 문제는 문제 목록에는 계속 표시되지만, 별도 `미분류` 필터는 제공하지 않는다.
 
 ### 문제 생성
 

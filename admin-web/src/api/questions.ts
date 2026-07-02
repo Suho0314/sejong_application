@@ -91,6 +91,10 @@ type QuestionResponse = {
   data: QuestionApiItem;
 };
 
+type QuestionCategoriesResponse = {
+  data: string[];
+};
+
 type PdfQuestionImportPreviewResponse = {
   data: {
     items: PdfQuestionImportPreviewItem[];
@@ -162,6 +166,10 @@ const toQueryString = (params: ListQuestionsParams) => {
 export const questionApi = {
   list(params: ListQuestionsParams) {
     return apiRequest<QuestionListResponse>(`/admin/questions?${toQueryString(params)}`);
+  },
+
+  listCategories() {
+    return apiRequest<QuestionCategoriesResponse>('/admin/questions/categories');
   },
 
   get(questionId: string) {

@@ -149,9 +149,10 @@ export function WorkbookPage() {
   const [workbookTotalItems, setWorkbookTotalItems] = useState(0);
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [questionSubjects, setQuestionSubjects] = useState<string[]>([]);
+  const [questionCategories, setQuestionCategories] = useState<string[]>([]);
   const [questionKeyword, setQuestionKeyword] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('all');
-  const [difficultyFilter, setDifficultyFilter] = useState<Difficulty | 'all'>('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
   const [editingWorkbookId, setEditingWorkbookId] = useState<string | null>(null);
   const [isWorkbookLoading, setIsWorkbookLoading] = useState(false);
@@ -238,7 +239,7 @@ export function WorkbookPage() {
         limit: QUESTION_LIMIT,
         keyword: questionKeyword,
         subject: subjectFilter === 'all' ? undefined : subjectFilter,
-        difficulty: difficultyFilter === 'all' ? undefined : difficultyFilter,
+        category: categoryFilter === 'all' ? undefined : categoryFilter,
         type: 'multiple_choice',
       });
 
@@ -249,16 +250,20 @@ export function WorkbookPage() {
     } finally {
       setIsQuestionLoading(false);
     }
-  }, [difficultyFilter, questionKeyword, subjectFilter]);
+  }, [categoryFilter, questionKeyword, subjectFilter]);
 
-  const loadQuestionSubjects = useCallback(async () => {
-    const response = await questionApi.list({
-      page: 1,
-      limit: QUESTION_LIMIT,
-      type: 'multiple_choice',
-    });
+  const loadQuestionFilterOptions = useCallback(async () => {
+    const [questionsResponse, categoriesResponse] = await Promise.all([
+      questionApi.list({
+        page: 1,
+        limit: QUESTION_LIMIT,
+        type: 'multiple_choice',
+      }),
+      questionApi.listCategories(),
+    ]);
 
-    setQuestionSubjects(Array.from(new Set(response.data.map((question) => question.subject))).sort());
+    setQuestionSubjects(Array.from(new Set(questionsResponse.data.map((question) => question.subject))).sort());
+    setQuestionCategories(categoriesResponse.data);
   }, []);
 
   useEffect(() => {
@@ -279,10 +284,10 @@ export function WorkbookPage() {
   }, [loadQuestions]);
 
   useEffect(() => {
-    loadQuestionSubjects().catch((error) => {
-      setErrorMessage(error instanceof Error ? error.message : '문제 과목 목록을 불러오지 못했습니다.');
+    loadQuestionFilterOptions().catch((error) => {
+      setErrorMessage(error instanceof Error ? error.message : '문제은행 필터 목록을 불러오지 못했습니다.');
     });
-  }, [loadQuestionSubjects]);
+  }, [loadQuestionFilterOptions]);
 
   const openCreateForm = () => {
     setEditingWorkbookId(null);
@@ -567,15 +572,14 @@ export function WorkbookPage() {
               </select>
             </label>
             <label className="search-field">
-              <span>난이도</span>
-              <select
-                value={difficultyFilter}
-                onChange={(event) => setDifficultyFilter(event.target.value as Difficulty | 'all')}
-              >
-                <option value="all">전체</option>
-                <option value="easy">쉬움</option>
-                <option value="medium">보통</option>
-                <option value="hard">어려움</option>
+              <span>카테고리</span>
+              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                <option value="all">전체 카테고리</option>
+                {questionCategories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
               </select>
             </label>
           </div>

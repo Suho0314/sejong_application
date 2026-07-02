@@ -55,6 +55,11 @@ export class QuestionsController {
     return this.questionsService.listQuestions(query);
   }
 
+  @Get('categories')
+  listCategories() {
+    return this.questionsService.listCategories();
+  }
+
   @Get(':questionId')
   getQuestion(@Param('questionId', ParseUUIDPipe) questionId: string) {
     return this.questionsService.getQuestion(questionId);
