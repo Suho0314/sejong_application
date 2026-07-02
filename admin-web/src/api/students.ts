@@ -8,6 +8,7 @@ export type StudentApiItem = {
   loginId: string;
   email: string | null;
   phone: string | null;
+  birthDate: string | null;
   cohort: {
     id: string | null;
     name: string | null;
@@ -48,7 +49,18 @@ export type CreateStudentPayload = {
   memo?: string | null;
 };
 
-export type UpdateStudentPayload = Omit<CreateStudentPayload, 'password'>;
+export type UpdateStudentPayload = {
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  birthDate?: string | null;
+  cohortId?: string | null;
+  studentNo?: string | null;
+  status?: StudentStatus;
+  enrolledOn?: string | null;
+  completedOn?: string | null;
+  memo?: string | null;
+};
 
 type StudentListResponse = {
   data: StudentApiItem[];

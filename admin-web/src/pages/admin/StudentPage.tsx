@@ -30,11 +30,11 @@ const toRow = (student: StudentApiItem): StudentRow => {
     name: student.name,
     email: student.email ?? '',
     phone: student.phone ?? '',
-    birthDate: undefined,
+    birthDate: student.birthDate ?? undefined,
     studentNo: student.studentNo ?? '',
     status: student.status,
     enrolledAt: displayEnrolledOn,
-    enrolledOn: displayEnrolledOn,
+    enrolledOn: student.enrolledOn,
     createdAt: student.createdAt,
     updatedAt: student.updatedAt,
     deletedAt: null,
@@ -49,20 +49,18 @@ const toFormValues = (student: StudentRow): StudentFormValues => ({
   cohortId: student.cohortId ?? '',
   birthDate: student.birthDate ? student.birthDate.slice(0, 10) : '',
   status: student.status,
-  enrolledOn: student.enrolledOn ?? '',
+  enrolledOn: student.enrolledOn ? student.enrolledOn.slice(0, 10) : '',
 });
 
 const toPayload = (values: StudentFormValues): UpdateStudentPayload => ({
-  name: values.name,
-  loginId: values.studentNo,
-  email: values.email || null,
-  phone: values.phone || null,
+  name: values.name.trim(),
+  email: values.email.trim() || null,
+  phone: values.phone.trim() || null,
+  birthDate: values.birthDate || null,
   cohortId: values.cohortId || null,
-  studentNo: values.studentNo,
+  studentNo: values.studentNo.trim() || null,
   status: values.status,
-  enrolledOn: values.enrolledOn,
-  completedOn: null,
-  memo: null,
+  enrolledOn: values.enrolledOn || null,
 });
 
 export function StudentPage() {
@@ -78,6 +76,7 @@ export function StudentPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -160,11 +159,13 @@ export function StudentPage() {
 
     setIsSubmitting(true);
     setErrorMessage('');
+    setSuccessMessage('');
 
     try {
       await studentApi.update(editingStudent.id, toPayload(values));
       closeForm();
       await loadStudents();
+      setSuccessMessage('학생 정보가 저장되었습니다.');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '학생을 수정하지 못했습니다.');
     } finally {
@@ -314,6 +315,7 @@ export function StudentPage() {
         </div>
 
         {errorMessage ? <p className="table-subtitle">{errorMessage}</p> : null}
+        {successMessage ? <p className="table-subtitle">{successMessage}</p> : null}
         {isLoading ? <p className="table-subtitle">학생 목록을 불러오는 중입니다.</p> : null}
 
         <StudentTable

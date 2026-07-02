@@ -7,6 +7,7 @@ export type StudentRow = {
   login_id: string;
   email: string | null;
   phone: string | null;
+  birth_date: string | Date | null;
   cohort_id: string | null;
   cohort_name: string | null;
   auth_provider: string;
@@ -29,6 +30,7 @@ export type StudentResponse = {
   loginId: string;
   email: string | null;
   phone: string | null;
+  birthDate: string | null;
   cohort: {
     id: string | null;
     name: string | null;

@@ -666,12 +666,13 @@ Response:
       "loginId": "student01",
       "email": "student@example.com",
       "phone": "010-0000-0000",
+      "birthDate": "1990-01-01",
       "cohort": {
         "id": "cohort-uuid",
         "name": "2026년 1기"
       },
       "studentNo": "S-0001",
-      "status": "active",
+      "status": "approved",
       "enrolledOn": "2026-03-01",
       "completedOn": null,
       "createdAt": "2026-06-18T09:00:00+09:00",
@@ -705,7 +706,7 @@ Request:
   "phone": "010-0000-0000",
   "cohortId": "cohort-uuid",
   "studentNo": "S-0001",
-  "status": "active",
+  "status": "approved",
   "enrolledOn": "2026-03-01",
   "memo": "신규 등록"
 }
@@ -722,9 +723,10 @@ Response:
     "loginId": "student01",
     "email": "student@example.com",
     "phone": "010-0000-0000",
+    "birthDate": "1990-01-01",
     "cohortId": "cohort-uuid",
     "studentNo": "S-0001",
-    "status": "active",
+    "status": "approved",
     "enrolledOn": "2026-03-01",
     "completedOn": null,
     "createdAt": "2026-06-18T09:00:00+09:00",
@@ -759,7 +761,7 @@ Response:
       "name": "2026년 1기"
     },
     "studentNo": "S-0001",
-    "status": "active",
+    "status": "approved",
     "enrolledOn": "2026-03-01",
     "completedOn": null,
     "memo": "신규 등록",
@@ -782,12 +784,22 @@ Request:
 ```json
 {
   "name": "김학생",
+  "email": "student@example.com",
   "phone": "010-1111-2222",
+  "birthDate": "1990-01-01",
   "cohortId": "cohort-uuid",
-  "status": "paused",
+  "studentNo": "S-0001",
+  "status": "suspended",
+  "enrolledOn": "2026-03-01",
   "memo": "휴원"
 }
 ```
+
+수정 가능한 필드:
+
+- `name`, `email`, `phone`, `birthDate`, `cohortId`, `studentNo`, `status`, `enrolledOn`, `completedOn`, `memo`
+- `loginId`, `authProvider`, `providerUserId`, `role`, `deletedAt`은 일반 학생 수정 API로 변경하지 않는다.
+- `cohortId`는 `null`로 보내면 미배정으로 저장할 수 있다.
 
 Response:
 
@@ -795,10 +807,18 @@ Response:
 {
   "data": {
     "id": "student-uuid",
+    "userId": "user-uuid",
     "name": "김학생",
+    "loginId": "student01",
+    "email": "student@example.com",
     "phone": "010-1111-2222",
+    "birthDate": "1990-01-01",
     "cohortId": "cohort-uuid",
-    "status": "paused",
+    "studentNo": "S-0001",
+    "status": "suspended",
+    "enrolledOn": "2026-03-01",
+    "completedOn": null,
+    "memo": "휴원",
     "updatedAt": "2026-06-18T10:00:00+09:00"
   }
 }

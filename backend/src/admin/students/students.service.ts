@@ -139,6 +139,7 @@ export class StudentsService {
            (SELECT auth_provider FROM users WHERE users.id = students.user_id) AS auth_provider,
            (SELECT provider_user_id FROM users WHERE users.id = students.user_id) AS provider_user_id,
            students.phone,
+           students.birth_date::text AS birth_date,
            students.cohort_id,
            (SELECT name FROM cohorts WHERE cohorts.id = students.cohort_id) AS cohort_name,
            students.student_no,
@@ -174,10 +175,15 @@ export class StudentsService {
 
   async updateStudent(studentId: string, body: UpdateStudentDto) {
     const current = await this.findStudentById(studentId);
-    const enrolledOn = body.enrolledOn ?? current.enrolled_on;
-    const completedOn = body.completedOn === undefined ? current.completed_on : body.completedOn;
+    const nextCohortId = body.cohortId === undefined ? current.cohort_id : body.cohortId;
+    const nextBirthDate = body.birthDate === undefined ? current.birth_date : body.birthDate;
+    const nextEnrolledOn = body.enrolledOn === undefined ? current.enrolled_on : body.enrolledOn;
+    const nextCompletedOn = body.completedOn === undefined ? current.completed_on : body.completedOn;
+    const nextPhone = body.phone === undefined ? current.phone : body.phone;
+    const nextStudentNo = body.studentNo === undefined ? current.student_no : body.studentNo;
+    const nextMemo = body.memo === undefined ? current.memo : body.memo;
 
-    this.assertDateRange(enrolledOn, completedOn);
+    this.assertDateRange(nextEnrolledOn, nextCompletedOn);
 
     const pool = this.databaseService.getPool();
     const client = await pool.connect();
@@ -185,32 +191,23 @@ export class StudentsService {
     try {
       await client.query('BEGIN');
 
-      if (body.cohortId) {
-        await this.assertCohortExists(client, body.cohortId);
+      if (nextCohortId) {
+        await this.assertCohortExists(client, nextCohortId);
       }
 
-      if (
-        body.name !== undefined ||
-        body.loginId !== undefined ||
-        body.email !== undefined ||
-        body.status !== undefined
-      ) {
+      if (body.name !== undefined || body.email !== undefined) {
         await client.query(
           `UPDATE users
            SET
              name = COALESCE($2, name),
-             login_id = COALESCE($3, login_id),
-             email = $4,
-             status = COALESCE($5, status),
+             email = $3,
              updated_at = now()
            WHERE id = $1
              AND deleted_at IS NULL`,
           [
             current.user_id,
             body.name ?? null,
-            body.loginId ?? null,
             body.email === undefined ? current.email : body.email,
-            null,
           ],
         );
       }
@@ -218,13 +215,14 @@ export class StudentsService {
       const studentResult = await client.query<StudentRow>(
         `UPDATE students
          SET
-           cohort_id = COALESCE($2, cohort_id),
+           cohort_id = $2,
            phone = $3,
-           student_no = $4,
-           status = COALESCE($5, status),
-           enrolled_on = COALESCE($6, enrolled_on),
-           completed_on = $7,
-           memo = $8,
+           birth_date = $4,
+           student_no = $5,
+           status = COALESCE($6, status),
+           enrolled_on = $7,
+           completed_on = $8,
+           memo = $9,
            updated_at = now()
          WHERE id = $1
            AND deleted_at IS NULL
@@ -237,6 +235,7 @@ export class StudentsService {
            (SELECT auth_provider FROM users WHERE users.id = students.user_id) AS auth_provider,
            (SELECT provider_user_id FROM users WHERE users.id = students.user_id) AS provider_user_id,
            students.phone,
+           students.birth_date::text AS birth_date,
            students.cohort_id,
            (SELECT name FROM cohorts WHERE cohorts.id = students.cohort_id) AS cohort_name,
            students.student_no,
@@ -250,13 +249,14 @@ export class StudentsService {
            students.updated_at`,
         [
           studentId,
-          body.cohortId ?? null,
-          body.phone === undefined ? current.phone : body.phone,
-          body.studentNo === undefined ? current.student_no : body.studentNo,
+          nextCohortId,
+          nextPhone,
+          nextBirthDate,
+          nextStudentNo,
           body.status ?? null,
-          body.enrolledOn ?? null,
-          completedOn,
-          body.memo === undefined ? current.memo : body.memo,
+          nextEnrolledOn,
+          nextCompletedOn,
+          nextMemo,
         ],
       );
 
@@ -326,6 +326,7 @@ export class StudentsService {
            (SELECT auth_provider FROM users WHERE users.id = students.user_id) AS auth_provider,
            (SELECT provider_user_id FROM users WHERE users.id = students.user_id) AS provider_user_id,
            students.phone,
+           students.birth_date::text AS birth_date,
            students.cohort_id,
            (SELECT name FROM cohorts WHERE cohorts.id = students.cohort_id) AS cohort_name,
            students.student_no,
@@ -368,6 +369,7 @@ export class StudentsService {
       users.auth_provider,
       users.provider_user_id,
       students.phone,
+      students.birth_date::text AS birth_date,
       students.cohort_id,
       cohorts.name AS cohort_name,
       students.student_no,
@@ -447,6 +449,7 @@ export class StudentsService {
       loginId: row.login_id,
       email: row.email,
       phone: row.phone,
+      birthDate: this.toDateString(row.birth_date),
       cohort: {
         id: row.cohort_id,
         name: row.cohort_name,

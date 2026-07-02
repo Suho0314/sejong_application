@@ -41,7 +41,7 @@ export function StudentForm({ cohorts, disabled = false, initialValues, mode, on
   const [values, setValues] = useState<StudentFormValues>(initialValues ?? emptyValues);
 
   useEffect(() => {
-    setValues(initialValues ?? { ...emptyValues, cohortId: cohorts[0]?.id ?? '' });
+    setValues(initialValues ?? emptyValues);
   }, [cohorts, initialValues]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -97,6 +97,7 @@ export function StudentForm({ cohorts, disabled = false, initialValues, mode, on
             value={values.cohortId}
             onChange={(event) => setValues((current) => ({ ...current, cohortId: event.target.value }))}
           >
+            <option value="">미배정</option>
             {cohorts.map((cohort) => (
               <option key={cohort.id} value={cohort.id}>
                 {cohort.name}

@@ -10,11 +10,6 @@ export class UpdateStudentDto {
   name?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  loginId?: string;
-
-  @IsOptional()
   @IsEmail()
   @MaxLength(255)
   email?: string | null;
@@ -39,7 +34,11 @@ export class UpdateStudentDto {
 
   @IsOptional()
   @IsISO8601({ strict: true })
-  enrolledOn?: string;
+  birthDate?: string | null;
+
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  enrolledOn?: string | null;
 
   @IsOptional()
   @IsISO8601({ strict: true })
