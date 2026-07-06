@@ -10,11 +10,15 @@ type WrongAnswerCardProps = {
 };
 
 export function WrongAnswerCard({ answer, index }: WrongAnswerCardProps) {
+  const isCorrect = answer.isCorrect;
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.number}>오답 {index + 1}</Text>
-        <Text style={styles.badge}>틀림</Text>
+        <Text style={styles.number}>{isCorrect ? '정답' : '오답'} {index + 1}</Text>
+        <Text style={[styles.badge, isCorrect ? styles.correctResultBadge : styles.wrongResultBadge]}>
+          {isCorrect ? '정답' : '틀림'}
+        </Text>
       </View>
 
       <Text style={[styles.question, preserveLineBreaksStyle]}>{answer.questionContent}</Text>
@@ -53,7 +57,11 @@ export function WrongAnswerCard({ answer, index }: WrongAnswerCardProps) {
               <Text style={[styles.choiceText, preserveLineBreaksStyle]}>{choice.text}</Text>
 
               <View style={styles.choiceBadges}>
-                {selected ? <Text style={styles.selectedBadge}>내 답</Text> : null}
+                {selected ? (
+                  <Text style={[styles.selectedBadge, isCorrect && styles.correctSelectedBadge]}>
+                    내 답
+                  </Text>
+                ) : null}
                 {correct ? <Text style={styles.correctBadge}>정답</Text> : null}
               </View>
             </View>
@@ -86,10 +94,16 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     overflow: 'hidden',
     borderRadius: 999,
-    color: '#D14343',
-    backgroundColor: '#FDECEC',
     fontSize: 11,
     fontWeight: '900',
+  },
+  wrongResultBadge: {
+    color: '#D14343',
+    backgroundColor: '#FDECEC',
+  },
+  correctResultBadge: {
+    color: '#087437',
+    backgroundColor: '#E7F6EC',
   },
   question: {
     marginTop: 14,
@@ -164,6 +178,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FDECEC',
     fontSize: 10,
     fontWeight: '900',
+  },
+  correctSelectedBadge: {
+    color: '#087437',
+    backgroundColor: '#E7F6EC',
   },
   correctBadge: {
     paddingHorizontal: 7,

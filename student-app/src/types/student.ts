@@ -86,6 +86,8 @@ export type SubmissionRecord = {
   result: SubmissionResult;
 };
 
+export type AnswerReviewMode = 'incorrect' | 'correct';
+
 export type WrongAnswerHistoryGroup = {
   submissionId: string;
   workbookId: string;
@@ -93,6 +95,8 @@ export type WrongAnswerHistoryGroup = {
   latestSubmittedAt: string;
   latestScore: number;
   latestCorrectRate: number;
+  reviewMode: AnswerReviewMode;
+  answers: GradedAnswer[];
   wrongAnswers: GradedAnswer[];
 };
 
