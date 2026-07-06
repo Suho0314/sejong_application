@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { QuestionCard } from '../components/QuestionCard';
@@ -80,6 +80,8 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
   const progress = ((safeCurrentIndex + 1) / questions.length) * 100;
 
   const selectChoice = (selectedChoiceId: string) => {
+    if (submittingRef.current) return;
+
     const nextAnswers = upsertStudentAnswer(answers, currentQuestion.id, selectedChoiceId);
 
     setAnswers(nextAnswers);
@@ -87,6 +89,8 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
   };
 
   const moveToQuestion = (nextIndex: number) => {
+    if (submittingRef.current) return;
+
     const safeNextIndex = Math.min(Math.max(nextIndex, 0), questions.length - 1);
 
     setCurrentIndex(safeNextIndex);
@@ -162,7 +166,7 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
             </PrimaryButton>
           ) : (
             <PrimaryButton
-              disabled={!currentAnswer}
+              disabled={!currentAnswer || isSubmitting}
               onPress={() => moveToQuestion(safeCurrentIndex + 1)}
             >
               다음 문제
@@ -170,6 +174,21 @@ export function WorkbookSolveScreen({ navigation, route }: ScreenProps<'Workbook
           )}
         </View>
       </View>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={isSubmitting}
+        onRequestClose={() => undefined}
+      >
+        <View style={styles.submitModalOverlay}>
+          <View style={styles.submitModalCard}>
+            <ActivityIndicator color="#0B9444" size="large" />
+            <Text style={styles.submitModalTitle}>제출 중...</Text>
+            <Text style={styles.submitModalDescription}>조금만 기다려주세요</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -251,6 +270,37 @@ const styles = StyleSheet.create({
     color: '#D14343',
     fontSize: 13,
     fontWeight: '800',
+    textAlign: 'center',
+  },
+  submitModalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: 'rgba(26, 31, 27, 0.42)',
+  },
+  submitModalCard: {
+    width: '100%',
+    maxWidth: 280,
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    borderWidth: 1,
+    borderColor: '#DCE6DF',
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+  },
+  submitModalTitle: {
+    color: '#1A1F1B',
+    fontSize: 18,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  submitModalDescription: {
+    color: '#66706A',
+    fontSize: 14,
+    fontWeight: '700',
     textAlign: 'center',
   },
 });
