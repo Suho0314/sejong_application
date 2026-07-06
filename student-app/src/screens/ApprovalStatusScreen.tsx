@@ -51,11 +51,10 @@ export function ApprovalStatusScreen({ navigation }: ScreenProps<'ApprovalStatus
   const isMountedRef = useRef(true);
   const isCheckingRef = useRef(false);
   const hasNavigatedRef = useRef(false);
-  const [isChecking, setIsChecking] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
 
-  const checkApprovalStatus = useCallback(async (showLoading = false) => {
+  const checkApprovalStatus = useCallback(async () => {
     if (isCheckingRef.current || hasNavigatedRef.current || status !== 'pending') {
       return;
     }
@@ -66,7 +65,6 @@ export function ApprovalStatusScreen({ navigation }: ScreenProps<'ApprovalStatus
     }
 
     isCheckingRef.current = true;
-    if (showLoading) setIsChecking(true);
 
     try {
       const result = await refreshApprovalStatus();
@@ -89,16 +87,12 @@ export function ApprovalStatusScreen({ navigation }: ScreenProps<'ApprovalStatus
       }
     } finally {
       isCheckingRef.current = false;
-
-      if (isMountedRef.current) {
-        setIsChecking(false);
-      }
     }
   }, [approval?.approvalToken, navigation, refreshApprovalStatus, status]);
 
   useEffect(() => {
     isMountedRef.current = true;
-    void checkApprovalStatus(true);
+    void checkApprovalStatus();
 
     return () => {
       isMountedRef.current = false;
@@ -111,7 +105,7 @@ export function ApprovalStatusScreen({ navigation }: ScreenProps<'ApprovalStatus
     }
 
     const intervalId = setInterval(() => {
-      void checkApprovalStatus(false);
+      void checkApprovalStatus();
     }, POLLING_INTERVAL_MS);
 
     return () => {
@@ -122,7 +116,7 @@ export function ApprovalStatusScreen({ navigation }: ScreenProps<'ApprovalStatus
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
-        void checkApprovalStatus(true);
+        void checkApprovalStatus();
       }
     });
 
@@ -130,10 +124,6 @@ export function ApprovalStatusScreen({ navigation }: ScreenProps<'ApprovalStatus
       subscription.remove();
     };
   }, [checkApprovalStatus]);
-
-  const handleRefresh = () => {
-    void checkApprovalStatus(true);
-  };
 
   const handleRestartLogin = () => {
     logout();
@@ -166,11 +156,6 @@ export function ApprovalStatusScreen({ navigation }: ScreenProps<'ApprovalStatus
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
           <View style={styles.actions}>
-            {status === 'pending' ? (
-              <PrimaryButton disabled={isChecking || !approval?.approvalToken} onPress={handleRefresh}>
-                {isChecking ? '승인 상태 확인 중...' : '승인 상태 새로고침'}
-              </PrimaryButton>
-            ) : null}
             {!approval?.approvalToken && status === 'pending' ? (
               <PrimaryButton variant="light" onPress={handleRestartLogin}>
                 카카오 로그인 다시 하기
