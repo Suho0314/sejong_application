@@ -1,6 +1,7 @@
 import { createContext, type PropsWithChildren, useContext, useMemo, useState } from 'react';
 
 import {
+  checkStudentApprovalStatus,
   clearStudentApproval,
   getKakaoAuthorizationUrl,
   getStoredStudentApproval,
@@ -19,6 +20,7 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   getKakaoLoginUrl: (redirectUri: string, state: string) => Promise<string>;
   completeKakaoLogin: (code: string, redirectUri: string, state: string) => Promise<StudentUser | StudentApproval>;
+  refreshApprovalStatus: () => Promise<StudentUser | StudentApproval>;
   logout: (message?: string) => void;
 };
 
@@ -30,15 +32,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [expiredMessage, setExpiredMessage] = useState(() => getAuthExpiredMessage());
   const isAuthenticated = Boolean(user && getStudentAccessToken());
 
-  const value = useMemo<AuthContextValue>(() => ({
-    user,
-    approval,
-    expiredMessage,
-    isAuthenticated,
-    getKakaoLoginUrl: getKakaoAuthorizationUrl,
-    completeKakaoLogin: async (code, redirectUri, state) => {
-      const result = await loginStudentWithKakaoCode(code, redirectUri, state);
-
+  const value = useMemo<AuthContextValue>(() => {
+    const applyAuthResult = (result: StudentUser | StudentApproval) => {
       if ('role' in result) {
         setUser(result);
         setApproval(null);
@@ -49,15 +44,37 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
 
       return result;
-    },
-    logout: (message = '') => {
-      clearStudentAuth();
-      clearStudentApproval();
-      setUser(null);
-      setApproval(null);
-      setExpiredMessage(message);
-    },
-  }), [approval, expiredMessage, isAuthenticated, user]);
+    };
+
+    return {
+      user,
+      approval,
+      expiredMessage,
+      isAuthenticated,
+      getKakaoLoginUrl: getKakaoAuthorizationUrl,
+      completeKakaoLogin: async (code, redirectUri, state) => {
+        const result = await loginStudentWithKakaoCode(code, redirectUri, state);
+        return applyAuthResult(result);
+      },
+      refreshApprovalStatus: async () => {
+        const approvalToken = approval?.approvalToken;
+
+        if (!approvalToken) {
+          throw new Error('승인 상태 확인 정보가 없습니다. 다시 카카오 로그인해주세요.');
+        }
+
+        const result = await checkStudentApprovalStatus(approvalToken);
+        return applyAuthResult(result);
+      },
+      logout: (message = '') => {
+        clearStudentAuth();
+        clearStudentApproval();
+        setUser(null);
+        setApproval(null);
+        setExpiredMessage(message);
+      },
+    };
+  }, [approval, expiredMessage, isAuthenticated, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -18,6 +18,7 @@ import {
   LoginRole,
   LoginUserRow,
   StudentApprovalStatus,
+  StudentApprovalTokenPayload,
   TeacherAccountRow,
 } from './auth.types';
 
@@ -39,6 +40,7 @@ const INVALID_KAKAO_REDIRECT_URI_RESPONSE = {
 
 const KAKAO_STUDENT_FALLBACK_NAME = '카카오 학생';
 const KAKAO_STUDENT_PROFILE_SCOPES = ['profile_nickname', 'account_email'];
+const DEFAULT_STUDENT_APPROVAL_TOKEN_TTL_SECONDS = 60 * 60 * 24;
 
 const normalizeOptionalString = (value: unknown): string | null => {
   if (typeof value !== 'string') return null;
@@ -288,43 +290,27 @@ export class AuthService {
     const kakaoUser = await this.getKakaoUserInfo(kakaoAccessToken);
     const student = await this.findOrCreateKakaoStudent(kakaoUser);
 
-    if (student.user_status !== 'active') {
-      return this.toStudentStatusResponse('suspended', student);
-    }
-
-    if (student.student_status !== 'approved') {
-      return this.toStudentStatusResponse(student.student_status, student);
-    }
-
-    if (!student.cohort_id) {
-      return this.toStudentStatusResponse('pending', student);
-    }
-
-    const payload: AccessTokenPayload = {
-      sub: student.user_id,
-      role: 'student',
-      profileId: student.student_id,
-    };
-    const accessToken = await this.jwtService.signAsync(payload);
-
-    return {
-      data: {
-        status: 'approved' as const,
-        accessToken,
-        user: {
-          id: student.user_id,
-          role: 'student' as const,
-          name: student.name,
-          loginId: student.login_id,
-          email: student.email,
-          studentId: student.student_id,
-          cohortId: student.cohort_id,
-        },
-      },
-    };
+    return this.toStudentAuthStateResponse(student, true);
   }
 
 
+
+  async checkStudentApprovalStatus(approvalToken: string) {
+    const payload = await this.verifyStudentApprovalToken(approvalToken);
+    const student = await this.findKakaoStudentByUserId(payload.sub);
+
+    if (!student || student.student_id !== payload.profileId) {
+      throw new UnauthorizedException({
+        error: {
+          code: 'INVALID_APPROVAL_TOKEN',
+          message: '승인 상태를 확인할 수 없습니다. 다시 카카오 로그인해주세요.',
+          details: [],
+        },
+      });
+    }
+
+    return this.toStudentAuthStateResponse(student, false);
+  }
 
   private async findActiveTeacherAccount(userId?: string): Promise<TeacherAccountRow> {
     const account = await this.findActiveTeacherAccountRow(userId, false);
@@ -393,6 +379,96 @@ export class AuthService {
       createdAt: account.created_at,
       updatedAt: account.updated_at,
     };
+  }
+
+  private async verifyStudentApprovalToken(approvalToken: string): Promise<StudentApprovalTokenPayload> {
+    try {
+      const payload = await this.jwtService.verifyAsync<AccessTokenPayload>(approvalToken, {
+        secret: this.configService.get<string>('JWT_SECRET'),
+      });
+
+      if (
+        payload.role !== 'student' ||
+        payload.tokenUse !== 'student_approval' ||
+        !payload.sub ||
+        !payload.profileId
+      ) {
+        throw new Error('Invalid approval token payload');
+      }
+
+      return payload as StudentApprovalTokenPayload;
+    } catch {
+      throw new UnauthorizedException({
+        error: {
+          code: 'INVALID_APPROVAL_TOKEN',
+          message: '승인 상태 확인 정보가 만료되었습니다. 다시 카카오 로그인해주세요.',
+          details: [],
+        },
+      });
+    }
+  }
+
+  private async toStudentAuthStateResponse(student: KakaoStudentRow, includeApprovalToken: boolean) {
+    if (student.user_status !== 'active') {
+      return this.toStudentStatusResponse('suspended', student, false);
+    }
+
+    if (student.student_status !== 'approved') {
+      return this.toStudentStatusResponse(
+        student.student_status,
+        student,
+        includeApprovalToken && student.student_status === 'pending',
+      );
+    }
+
+    if (!student.cohort_id) {
+      return this.toStudentStatusResponse('pending', student, includeApprovalToken);
+    }
+
+    return this.toApprovedStudentLoginResponse(student);
+  }
+
+  private async toApprovedStudentLoginResponse(student: KakaoStudentRow) {
+    const payload: AccessTokenPayload = {
+      sub: student.user_id,
+      role: 'student',
+      profileId: student.student_id,
+    };
+    const accessToken = await this.jwtService.signAsync(payload);
+
+    return {
+      data: {
+        status: 'approved' as const,
+        accessToken,
+        user: {
+          id: student.user_id,
+          role: 'student' as const,
+          name: student.name,
+          loginId: student.login_id,
+          email: student.email,
+          studentId: student.student_id,
+          cohortId: student.cohort_id,
+        },
+      },
+    };
+  }
+
+  private async issueStudentApprovalToken(student: KakaoStudentRow): Promise<string> {
+    const configuredTtl = Number(
+      this.configService.get<string>('JWT_STUDENT_APPROVAL_TOKEN_TTL_SECONDS') ??
+        DEFAULT_STUDENT_APPROVAL_TOKEN_TTL_SECONDS,
+    );
+    const expiresIn = Number.isInteger(configuredTtl) && configuredTtl > 0
+      ? configuredTtl
+      : DEFAULT_STUDENT_APPROVAL_TOKEN_TTL_SECONDS;
+    const payload: StudentApprovalTokenPayload = {
+      sub: student.user_id,
+      role: 'student',
+      profileId: student.student_id,
+      tokenUse: 'student_approval',
+    };
+
+    return this.jwtService.signAsync(payload, { expiresIn });
   }
 
   private async exchangeKakaoCode(code: string, redirectUri: string): Promise<string> {
@@ -590,10 +666,41 @@ export class AuthService {
     return result.rows[0] ?? null;
   }
 
-  private toStudentStatusResponse(status: StudentApprovalStatus, student: KakaoStudentRow) {
+  private async findKakaoStudentByUserId(userId: string): Promise<KakaoStudentRow | null> {
+    const result = await this.databaseService.getPool().query<KakaoStudentRow>(
+      `SELECT
+         users.id AS user_id,
+         users.login_id,
+         users.name,
+         users.email,
+         users.status AS user_status,
+         students.id AS student_id,
+         students.cohort_id,
+         students.status AS student_status
+       FROM users
+       JOIN students
+         ON students.user_id = users.id
+        AND students.deleted_at IS NULL
+       WHERE users.id = $1
+         AND users.role = 'student'
+         AND users.auth_provider = 'kakao'
+         AND users.deleted_at IS NULL
+       LIMIT 1`,
+      [userId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  private async toStudentStatusResponse(
+    status: StudentApprovalStatus,
+    student: KakaoStudentRow,
+    includeApprovalToken: boolean,
+  ) {
     return {
       data: {
         status,
+        ...(includeApprovalToken ? { approvalToken: await this.issueStudentApprovalToken(student) } : {}),
         student: {
           id: student.student_id,
           name: student.name,

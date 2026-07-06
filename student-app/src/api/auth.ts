@@ -23,6 +23,7 @@ export type StudentApprovalStatus = 'pending' | 'rejected' | 'suspended';
 
 export type StudentApproval = {
   status: StudentApprovalStatus;
+  approvalToken?: string;
   student: {
     id: string;
     name: string;
@@ -85,6 +86,26 @@ export const getKakaoAuthorizationUrl = async (redirectUri: string, state: strin
   return response.data.authorizationUrl;
 };
 
+const persistStudentAuthResult = (data: KakaoLoginResponse['data']) => {
+  if (data.status !== 'approved') {
+    clearStudentAuth();
+    const storedApproval = getStoredStudentApproval();
+    const nextApproval: StudentApproval =
+      data.status === 'pending' && !data.approvalToken && storedApproval?.approvalToken
+        ? { ...data, approvalToken: storedApproval.approvalToken }
+        : data;
+
+    appStorage.setItem(STUDENT_APPROVAL_STORAGE_KEY, JSON.stringify(nextApproval));
+    return nextApproval;
+  }
+
+  appStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, data.accessToken);
+  appStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+  clearStudentApproval();
+
+  return data.user;
+};
+
 export const loginStudentWithKakaoCode = async (code: string, redirectUri: string, state: string) => {
   const response = await apiRequest<KakaoLoginResponse>('/auth/student/kakao/callback', {
     auth: false,
@@ -92,15 +113,15 @@ export const loginStudentWithKakaoCode = async (code: string, redirectUri: strin
     body: JSON.stringify({ code, redirectUri, state }),
   });
 
-  if (response.data.status !== 'approved') {
-    clearStudentAuth();
-    appStorage.setItem(STUDENT_APPROVAL_STORAGE_KEY, JSON.stringify(response.data));
-    return response.data;
-  }
+  return persistStudentAuthResult(response.data);
+};
 
-  appStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, response.data.accessToken);
-  appStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.data.user));
-  clearStudentApproval();
+export const checkStudentApprovalStatus = async (approvalToken: string) => {
+  const response = await apiRequest<KakaoLoginResponse>('/auth/student/approval-status', {
+    auth: false,
+    method: 'POST',
+    body: JSON.stringify({ approvalToken }),
+  });
 
-  return response.data.user;
+  return persistStudentAuthResult(response.data);
 };

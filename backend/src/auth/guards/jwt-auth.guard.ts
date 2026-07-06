@@ -41,6 +41,16 @@ export class JwtAuthGuard implements CanActivate {
         secret: this.configService.get<string>('JWT_SECRET'),
       });
 
+      if (request.user.tokenUse === 'student_approval') {
+        throw new UnauthorizedException({
+          error: {
+            code: 'INVALID_TOKEN',
+            message: '유효하지 않은 인증 토큰입니다.',
+            details: [],
+          },
+        });
+      }
+
       if (request.user.role === 'student') {
         await this.assertApprovedStudent(request.user);
       }
