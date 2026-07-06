@@ -24,12 +24,17 @@ function formatSubmittedAt(value: string) {
 }
 
 export function WrongAnswerSummaryCard({ history, isExpanded }: WrongAnswerSummaryCardProps) {
+  const answerCount = history.answers.length;
+  const isCorrectMode = history.reviewMode === 'correct';
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>{history.workbookTitle}</Text>
         <View style={styles.headerActions}>
-          <Text style={styles.wrongBadge}>오답 {history.wrongAnswers.length}개</Text>
+          <Text style={[styles.answerBadge, isCorrectMode ? styles.correctBadge : styles.wrongBadge]}>
+            {isCorrectMode ? '정답' : '오답'} {answerCount}개
+          </Text>
           <View style={styles.toggleIcon}>
             <Text style={styles.toggleIconText}>{isExpanded ? '⌃' : '⌄'}</Text>
           </View>
@@ -52,8 +57,10 @@ export function WrongAnswerSummaryCard({ history, isExpanded }: WrongAnswerSumma
         </View>
         <View style={styles.divider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, styles.wrongValue]}>{history.wrongAnswers.length}</Text>
-          <Text style={styles.statLabel}>누적 오답</Text>
+          <Text style={[styles.statValue, isCorrectMode ? styles.correctValue : styles.wrongValue]}>
+            {answerCount}
+          </Text>
+          <Text style={styles.statLabel}>누적 {isCorrectMode ? '정답' : '오답'}</Text>
         </View>
       </View>
     </View>
@@ -84,15 +91,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  wrongBadge: {
+  answerBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     overflow: 'hidden',
     borderRadius: 999,
-    color: '#D14343',
-    backgroundColor: '#FDECEC',
     fontSize: 11,
     fontWeight: '900',
+  },
+  wrongBadge: {
+    color: '#D14343',
+    backgroundColor: '#FDECEC',
+  },
+  correctBadge: {
+    color: '#087437',
+    backgroundColor: '#E7F6EC',
   },
   toggleIcon: {
     width: 28,
@@ -129,6 +142,9 @@ const styles = StyleSheet.create({
     color: '#087437',
     fontSize: 19,
     fontWeight: '900',
+  },
+  correctValue: {
+    color: '#087437',
   },
   wrongValue: {
     color: '#D14343',

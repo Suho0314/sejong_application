@@ -1,4 +1,5 @@
 import type {
+  AnswerReviewMode,
   GradedAnswer,
   SubmissionRecord,
   WrongAnswerHistoryGroup,
@@ -11,6 +12,7 @@ type MutableWrongAnswerGroup = WrongAnswerHistoryGroup & {
 export function buildWrongAnswerHistory(
   submissions: SubmissionRecord[],
   cohortId: string,
+  reviewMode: AnswerReviewMode = 'incorrect',
 ): WrongAnswerHistoryGroup[] {
   const sortedSubmissions = [...submissions]
     .filter((submission) => submission.result.cohortId === cohortId)
@@ -33,6 +35,8 @@ export function buildWrongAnswerHistory(
         latestSubmittedAt: submission.submittedAt,
         latestScore: result.score,
         latestCorrectRate: result.correctRate,
+        reviewMode,
+        answers: [],
         wrongAnswers: [],
         answerByQuestionId: new Map(),
       };
@@ -40,7 +44,7 @@ export function buildWrongAnswerHistory(
     }
 
     (result.gradedAnswers ?? [])
-      .filter((answer) => !answer.isCorrect)
+      .filter((answer) => (reviewMode === 'correct' ? answer.isCorrect : !answer.isCorrect))
       .forEach((answer) => {
         if (!group?.answerByQuestionId.has(answer.questionId)) {
           group?.answerByQuestionId.set(answer.questionId, answer);
@@ -49,11 +53,16 @@ export function buildWrongAnswerHistory(
   });
 
   return Array.from(groupByWorkbookId.values())
-    .map(({ answerByQuestionId, ...group }) => ({
-      ...group,
-      wrongAnswers: Array.from(answerByQuestionId.values()),
-    }))
-    .filter((group) => group.wrongAnswers.length > 0)
+    .map(({ answerByQuestionId, ...group }) => {
+      const answers = Array.from(answerByQuestionId.values());
+
+      return {
+        ...group,
+        answers,
+        wrongAnswers: reviewMode === 'incorrect' ? answers : [],
+      };
+    })
+    .filter((group) => group.answers.length > 0)
     .sort(
       (left, right) =>
         new Date(right.latestSubmittedAt).getTime() -
