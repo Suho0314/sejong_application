@@ -16,9 +16,16 @@ export type AccessTokenPayload = {
   sub: string;
   role: UserRole;
   profileId?: string;
+  tokenUse?: 'student_approval';
 };
 
 export type StudentApprovalStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+
+export type StudentApprovalTokenPayload = AccessTokenPayload & {
+  role: 'student';
+  profileId: string;
+  tokenUse: 'student_approval';
+};
 
 export type KakaoUserInfo = {
   providerUserId: string;

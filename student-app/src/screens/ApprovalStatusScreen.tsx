@@ -1,9 +1,13 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen } from '../components/Screen';
+import { ApiNetworkError } from '../api/client';
 import { useAuth } from '../state/AuthContext';
 import type { ScreenProps } from '../types/navigation';
+
+const POLLING_INTERVAL_MS = 5000;
 
 const statusMessages = {
   pending: {
@@ -20,12 +24,119 @@ const statusMessages = {
   },
 };
 
+const getStatusErrorMessage = (error: unknown) => {
+  if (error instanceof ApiNetworkError) {
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return '승인 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.';
+};
+
+const formatCheckedAt = (date: Date | null) => {
+  if (!date) return '';
+
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(
+    date.getSeconds(),
+  ).padStart(2, '0')}`;
+};
+
 export function ApprovalStatusScreen({ navigation }: ScreenProps<'ApprovalStatus'>) {
-  const { approval, logout } = useAuth();
+  const { approval, logout, refreshApprovalStatus } = useAuth();
   const status = approval?.status ?? 'pending';
   const message = statusMessages[status];
+  const isMountedRef = useRef(true);
+  const isCheckingRef = useRef(false);
+  const hasNavigatedRef = useRef(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
+
+  const checkApprovalStatus = useCallback(async (showLoading = false) => {
+    if (isCheckingRef.current || hasNavigatedRef.current || status !== 'pending') {
+      return;
+    }
+
+    if (!approval?.approvalToken) {
+      setErrorMessage('승인 상태 확인 정보가 없습니다. 다시 카카오 로그인해주세요.');
+      return;
+    }
+
+    isCheckingRef.current = true;
+    if (showLoading) setIsChecking(true);
+
+    try {
+      const result = await refreshApprovalStatus();
+
+      if (!isMountedRef.current) return;
+
+      setLastCheckedAt(new Date());
+      setErrorMessage('');
+
+      if ('role' in result && !hasNavigatedRef.current) {
+        hasNavigatedRef.current = true;
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'CohortSelect' }],
+        });
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        setErrorMessage(getStatusErrorMessage(error));
+      }
+    } finally {
+      isCheckingRef.current = false;
+
+      if (isMountedRef.current) {
+        setIsChecking(false);
+      }
+    }
+  }, [approval?.approvalToken, navigation, refreshApprovalStatus, status]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    void checkApprovalStatus(true);
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [checkApprovalStatus]);
+
+  useEffect(() => {
+    if (status !== 'pending' || !approval?.approvalToken) {
+      return undefined;
+    }
+
+    const intervalId = setInterval(() => {
+      void checkApprovalStatus(false);
+    }, POLLING_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [approval?.approvalToken, checkApprovalStatus, status]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void checkApprovalStatus(true);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [checkApprovalStatus]);
 
   const handleRefresh = () => {
+    void checkApprovalStatus(true);
+  };
+
+  const handleRestartLogin = () => {
+    logout();
     navigation.replace('Login');
   };
 
@@ -43,11 +154,28 @@ export function ApprovalStatusScreen({ navigation }: ScreenProps<'ApprovalStatus
               <Text style={styles.infoValue}>{approval.student.name}</Text>
               <Text style={styles.infoLabel}>상태</Text>
               <Text style={styles.infoValue}>{status}</Text>
+              {lastCheckedAt ? (
+                <>
+                  <Text style={styles.infoLabel}>최근 확인</Text>
+                  <Text style={styles.infoValue}>{formatCheckedAt(lastCheckedAt)}</Text>
+                </>
+              ) : null}
             </View>
           ) : null}
 
+          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
           <View style={styles.actions}>
-            <PrimaryButton onPress={handleRefresh}>승인 상태 새로고침</PrimaryButton>
+            {status === 'pending' ? (
+              <PrimaryButton disabled={isChecking || !approval?.approvalToken} onPress={handleRefresh}>
+                {isChecking ? '승인 상태 확인 중...' : '승인 상태 새로고침'}
+              </PrimaryButton>
+            ) : null}
+            {!approval?.approvalToken && status === 'pending' ? (
+              <PrimaryButton variant="light" onPress={handleRestartLogin}>
+                카카오 로그인 다시 하기
+              </PrimaryButton>
+            ) : null}
             <PrimaryButton variant="light" onPress={() => logout()}>
               로그아웃
             </PrimaryButton>
@@ -101,6 +229,12 @@ const styles = StyleSheet.create({
     color: '#1A1F1B',
     fontSize: 15,
     fontWeight: '900',
+  },
+  errorText: {
+    color: '#D14343',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
   },
   actions: {
     gap: 10,

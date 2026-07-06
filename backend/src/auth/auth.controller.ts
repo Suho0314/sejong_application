@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Query, Req, U
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { KakaoAuthorizeQueryDto, KakaoCallbackDto } from './dto/kakao-login.dto';
+import { StudentApprovalStatusDto } from './dto/student-approval-status.dto';
 import { ChangeTeacherPasswordDto, UpdateTeacherAccountDto } from './dto/account-settings.dto';
 import { Roles } from './decorators/roles.decorator';
 import { AuthenticatedRequest, JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -59,5 +60,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   loginStudentWithKakao(@Body() body: KakaoCallbackDto) {
     return this.authService.loginStudentWithKakao(body.code, body.redirectUri, body.state);
+  }
+
+  @Post('student/approval-status')
+  @HttpCode(HttpStatus.OK)
+  checkStudentApprovalStatus(@Body() body: StudentApprovalStatusDto) {
+    return this.authService.checkStudentApprovalStatus(body.approvalToken);
   }
 }
