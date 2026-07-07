@@ -1585,6 +1585,9 @@ Response:
 
 Query parameters: `status`, `keyword`, `page`, `limit`
 
+- 기본 정렬은 문제집 제목의 앞뒤 공백을 제외한 가나다순 오름차순이다.
+- 제목이 같은 경우 `createdAt`, `id` 오름차순을 보조 기준으로 사용해 페이지네이션 순서를 안정적으로 유지한다.
+
 Example: `GET /api/admin/workbooks?status=draft&keyword=기본간호&page=1&limit=20`
 
 Response:
