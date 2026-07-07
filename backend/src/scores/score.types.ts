@@ -73,6 +73,16 @@ export type CohortSummaryRow = AverageSummaryRow & {
   submitted_student_count: string;
 };
 
+export type WorkbookQuestionStatsRow = {
+  question_number: number;
+  question_id: string;
+  question_text: string;
+  answer_count: number | string;
+  correct_count: number | string;
+  wrong_count: number | string;
+  wrong_rate: number | string;
+};
+
 export type StudentProfileRow = {
   id: string;
 };

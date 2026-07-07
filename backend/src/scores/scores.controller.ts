@@ -25,6 +25,12 @@ export class ScoresController {
     return this.scoresService.getStudentScores(studentId, query);
   }
 
+  @Get('admin/scores/workbooks/:workbookId/question-stats')
+  @Roles('admin', 'teacher')
+  getWorkbookQuestionStats(@Param('workbookId', ParseUUIDPipe) workbookId: string) {
+    return this.scoresService.getWorkbookQuestionStats(workbookId);
+  }
+
   @Get('admin/scores/workbooks/:workbookId')
   @Roles('admin', 'teacher')
   getWorkbookScores(
@@ -58,4 +64,3 @@ export class ScoresController {
     return this.scoresService.getStudentScore(submissionId, request.user?.sub);
   }
 }
-

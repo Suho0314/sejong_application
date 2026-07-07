@@ -1,6 +1,6 @@
 import { CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
 import { cohortApi, CohortApiItem } from '../../../api/cohorts';
-import { scoreApi, ScoreApiItem } from '../../../api/scores';
+import { scoreApi, ScoreApiItem, WorkbookQuestionStatsApiItem } from '../../../api/scores';
 import { studentApi, StudentApiItem } from '../../../api/students';
 import { submissionApi, SubmissionDetailApiItem } from '../../../api/submissions';
 import { workbookAssignmentApi, WorkbookAssignmentApiItem } from '../../../api/workbookAssignments';
@@ -27,6 +27,14 @@ const modalPanelStyle: CSSProperties = {
   maxWidth: 920,
   overflowY: 'auto',
   width: 'min(920px, 100%)',
+};
+
+const questionTextPreviewStyle: CSSProperties = {
+  display: '-webkit-box',
+  overflow: 'hidden',
+  WebkitBoxOrient: 'vertical',
+  WebkitLineClamp: 2,
+  whiteSpace: 'normal',
 };
 
 const formatDate = (value?: string | null) => {
@@ -60,6 +68,19 @@ const average = (values: number[]) => {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 };
 
+const formatWrongRate = (wrongRate: number) =>
+  new Intl.NumberFormat('ko-KR', {
+    maximumFractionDigits: 1,
+  }).format(wrongRate);
+
+const formatWrongRateSummary = (stat: WorkbookQuestionStatsApiItem) => {
+  if (stat.answerCount === 0) {
+    return '- / 0건';
+  }
+
+  return `${formatWrongRate(stat.wrongRate)}% / ${stat.answerCount}건`;
+};
+
 export function ScorePage() {
   const [scores, setScores] = useState<ScoreApiItem[]>([]);
   const [cohorts, setCohorts] = useState<CohortApiItem[]>([]);
@@ -73,9 +94,12 @@ export function ScorePage() {
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionDetailApiItem | null>(null);
+  const [questionStats, setQuestionStats] = useState<WorkbookQuestionStatsApiItem[]>([]);
+  const [isQuestionStatsOpen, setIsQuestionStatsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isOptionLoading, setIsOptionLoading] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [isQuestionStatsLoading, setIsQuestionStatsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -84,6 +108,8 @@ export function ScorePage() {
   const submittedScores = scores.filter((score) => score.submittedAt);
   const averageScore = average(submittedScores.map((score) => score.score));
   const averageCorrectRate = average(submittedScores.map((score) => score.correctRate));
+  const selectedWorkbook = workbooks.find((workbook) => workbook.id === workbookId);
+  const hasSelectedWorkbook = workbookId !== 'all';
 
   const statCards = [
     {
@@ -183,6 +209,29 @@ export function ScorePage() {
     }
   };
 
+  const openQuestionStats = async () => {
+    if (!hasSelectedWorkbook) return;
+
+    setIsQuestionStatsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const response = await scoreApi.getWorkbookQuestionStats(workbookId);
+      setQuestionStats(response.data);
+      setIsQuestionStatsOpen(true);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '문항별 오답률을 불러오지 못했습니다.');
+      setQuestionStats([]);
+    } finally {
+      setIsQuestionStatsLoading(false);
+    }
+  };
+
+  const closeQuestionStats = () => {
+    setIsQuestionStatsOpen(false);
+    setQuestionStats([]);
+  };
+
   return (
     <div className="dashboard-page">
       <section className="page-heading">
@@ -267,13 +316,78 @@ export function ScorePage() {
             <h2>성적 목록</h2>
             <p>학생명, 기수명, 문제집명, 점수, 제출일을 확인합니다.</p>
           </div>
+          <button
+            className="secondary-button"
+            disabled={!hasSelectedWorkbook || isQuestionStatsLoading}
+            type="button"
+            onClick={openQuestionStats}
+          >
+            {isQuestionStatsLoading ? '불러오는 중...' : '문항별 오답률 보기'}
+          </button>
         </div>
+        {!hasSelectedWorkbook ? (
+          <p className="table-subtitle">문항별 오답률을 보려면 문제집을 먼저 선택해주세요.</p>
+        ) : null}
         {isLoading ? <p className="table-subtitle">성적 목록을 불러오는 중입니다.</p> : null}
         <ScoreSubmissionTable submissions={rows} onViewDetail={viewSubmissionDetail} />
         <Pagination currentPage={currentPage} totalItems={totalItems} totalPages={totalPages} onPageChange={setPage} />
       </section>
 
       {isDetailLoading ? <p className="table-subtitle">제출 상세를 불러오는 중입니다.</p> : null}
+
+      {isQuestionStatsOpen ? (
+        <div aria-modal="true" role="dialog" style={modalBackdropStyle}>
+          <section className="dashboard-panel" style={modalPanelStyle}>
+            <div className="panel-header">
+              <div>
+                <h2>문항별 오답률</h2>
+                <p>{selectedWorkbook?.title ?? '선택한 문제집'} 기준 문항별 제출 통계입니다.</p>
+              </div>
+              <button className="secondary-button" type="button" onClick={closeQuestionStats}>
+                닫기
+              </button>
+            </div>
+
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>번호</th>
+                    <th>문제 내용</th>
+                    <th>응답수</th>
+                    <th>정답수</th>
+                    <th>오답수</th>
+                    <th>오답률</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {questionStats.map((stat) => (
+                    <tr key={stat.questionId}>
+                      <td>{stat.questionNumber}번</td>
+                      <td>
+                        <div className="table-title" style={questionTextPreviewStyle}>
+                          {stat.questionText}
+                        </div>
+                      </td>
+                      <td>{stat.answerCount.toLocaleString('ko-KR')}건</td>
+                      <td>{stat.correctCount.toLocaleString('ko-KR')}건</td>
+                      <td>{stat.wrongCount.toLocaleString('ko-KR')}건</td>
+                      <td>{formatWrongRateSummary(stat)}</td>
+                    </tr>
+                  ))}
+                  {questionStats.length === 0 ? (
+                    <tr>
+                      <td className="empty-cell" colSpan={6}>
+                        문항 데이터가 없습니다.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {selectedSubmission ? (
         <div aria-modal="true" role="dialog" style={modalBackdropStyle}>

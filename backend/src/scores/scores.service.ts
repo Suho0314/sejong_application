@@ -9,6 +9,7 @@ import {
   ScoreRow,
   StudentProfileRow,
   StudentSummaryRow,
+  WorkbookQuestionStatsRow,
   WorkbookSummaryRow,
 } from './score.types';
 
@@ -80,6 +81,62 @@ export class ScoresService {
         scores: scores.data,
       },
       meta: scores.meta,
+    };
+  }
+
+  async getWorkbookQuestionStats(workbookId: string) {
+    await this.assertWorkbookExists(workbookId);
+
+    const result = await this.databaseService.getPool().query<WorkbookQuestionStatsRow>(
+      `SELECT
+         workbook_questions.sequence AS question_number,
+         questions.id AS question_id,
+         questions.content AS question_text,
+         COALESCE(answer_stats.answer_count, 0)::int AS answer_count,
+         COALESCE(answer_stats.correct_count, 0)::int AS correct_count,
+         COALESCE(answer_stats.wrong_count, 0)::int AS wrong_count,
+         CASE
+           WHEN COALESCE(answer_stats.answer_count, 0) = 0 THEN 0
+           ELSE ROUND(
+             (answer_stats.wrong_count::numeric / answer_stats.answer_count::numeric) * 100,
+             1
+           )::float
+         END AS wrong_rate
+       FROM workbook_questions
+       JOIN questions
+         ON questions.id = workbook_questions.question_id
+        AND questions.deleted_at IS NULL
+       LEFT JOIN (
+         SELECT
+           submission_answers.workbook_question_id,
+           COUNT(*)::int AS answer_count,
+           COUNT(*) FILTER (WHERE submission_answers.is_correct)::int AS correct_count,
+           COUNT(*) FILTER (WHERE NOT submission_answers.is_correct)::int AS wrong_count
+         FROM submission_answers
+         JOIN submissions
+           ON submissions.id = submission_answers.submission_id
+          AND submissions.deleted_at IS NULL
+          AND submissions.workbook_id = $1
+         WHERE submission_answers.deleted_at IS NULL
+         GROUP BY submission_answers.workbook_question_id
+       ) answer_stats
+         ON answer_stats.workbook_question_id = workbook_questions.id
+       WHERE workbook_questions.workbook_id = $1
+         AND workbook_questions.deleted_at IS NULL
+       ORDER BY workbook_questions.sequence ASC`,
+      [workbookId],
+    );
+
+    return {
+      data: result.rows.map((row) => ({
+        questionNumber: Number(row.question_number),
+        questionId: row.question_id,
+        questionText: row.question_text,
+        answerCount: Number(row.answer_count ?? 0),
+        correctCount: Number(row.correct_count ?? 0),
+        wrongCount: Number(row.wrong_count ?? 0),
+        wrongRate: Number(row.wrong_rate ?? 0),
+      })),
     };
   }
 
@@ -195,6 +252,21 @@ export class ScoresService {
       },
       ...this.toAverageSummary(average),
     };
+  }
+
+  private async assertWorkbookExists(workbookId: string): Promise<void> {
+    const result = await this.databaseService.getPool().query<{ id: string }>(
+      `SELECT id
+       FROM workbooks
+       WHERE id = $1
+         AND deleted_at IS NULL
+       LIMIT 1`,
+      [workbookId],
+    );
+
+    if (!result.rows[0]) {
+      throw this.notFound('WORKBOOK_NOT_FOUND', '문제집을 찾을 수 없습니다.');
+    }
   }
 
   private async getCohortSummary(cohortId: string, query: ListScoresDto) {

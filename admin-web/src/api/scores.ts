@@ -33,6 +33,16 @@ export type ScoreApiItem = {
   updatedAt: string;
 };
 
+export type WorkbookQuestionStatsApiItem = {
+  questionNumber: number;
+  questionId: string;
+  questionText: string;
+  answerCount: number;
+  correctCount: number;
+  wrongCount: number;
+  wrongRate: number;
+};
+
 export type ListScoresParams = {
   page: number;
   limit: number;
@@ -49,6 +59,10 @@ type ScoreListResponse = {
     limit: number;
     total: number;
   };
+};
+
+type WorkbookQuestionStatsResponse = {
+  data: WorkbookQuestionStatsApiItem[];
 };
 
 const toQueryString = (params: ListScoresParams) => {
@@ -68,5 +82,9 @@ const toQueryString = (params: ListScoresParams) => {
 export const scoreApi = {
   list(params: ListScoresParams) {
     return apiRequest<ScoreListResponse>(`/admin/scores?${toQueryString(params)}`);
+  },
+
+  getWorkbookQuestionStats(workbookId: string) {
+    return apiRequest<WorkbookQuestionStatsResponse>(`/admin/scores/workbooks/${workbookId}/question-stats`);
   },
 };
