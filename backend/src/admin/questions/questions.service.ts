@@ -70,15 +70,19 @@ export class QuestionsService {
     }
 
     const whereSql = whereClauses.join(' AND ');
+    const orderSql = this.resolveListOrderSql(query);
     const dataValues = [...values, limit, offset];
     const limitParam = values.length + 1;
     const offsetParam = values.length + 2;
 
     const [dataResult, countResult] = await Promise.all([
       this.databaseService.getPool().query<QuestionRow>(
-        `${this.baseQuestionSelectSql()}
-         WHERE ${whereSql}
-         ORDER BY questions.created_at DESC
+        `SELECT *
+         FROM (
+           ${this.baseQuestionSelectSql()}
+           WHERE ${whereSql}
+         ) filtered_questions
+         ORDER BY ${orderSql}
          LIMIT $${limitParam}
          OFFSET $${offsetParam}`,
         dataValues,
@@ -105,6 +109,18 @@ export class QuestionsService {
         total: Number(countResult.rows[0]?.total ?? 0),
       },
     };
+  }
+
+  private resolveListOrderSql(query: ListQuestionsDto): string {
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = query.sortOrder ?? 'desc';
+    const direction = sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+    if (sortBy === 'wrongRate') {
+      return `filtered_questions.wrong_rate ${direction}, filtered_questions.created_at DESC, filtered_questions.id DESC`;
+    }
+
+    return `filtered_questions.created_at ${direction}, filtered_questions.id DESC`;
   }
 
   async listCategories() {

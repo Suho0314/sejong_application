@@ -5,6 +5,11 @@ import { QuestionDifficulty, QuestionStatus, QuestionType } from '../question.ty
 const DIFFICULTIES: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
 const QUESTION_TYPES: QuestionType[] = ['multiple_choice'];
 const STATUSES: QuestionStatus[] = ['draft', 'published', 'archived'];
+const SORT_FIELDS = ['createdAt', 'wrongRate'] as const;
+const SORT_ORDERS = ['asc', 'desc'] as const;
+
+export type QuestionSortBy = (typeof SORT_FIELDS)[number];
+export type QuestionSortOrder = (typeof SORT_ORDERS)[number];
 
 export class ListQuestionsDto {
   @IsOptional()
@@ -34,6 +39,14 @@ export class ListQuestionsDto {
   @IsOptional()
   @IsIn(STATUSES)
   status?: QuestionStatus;
+
+  @IsOptional()
+  @IsIn(SORT_FIELDS)
+  sortBy: QuestionSortBy = 'createdAt';
+
+  @IsOptional()
+  @IsIn(SORT_ORDERS)
+  sortOrder: QuestionSortOrder = 'desc';
 
   @IsOptional()
   @Transform(({ value }) => Number(value))
