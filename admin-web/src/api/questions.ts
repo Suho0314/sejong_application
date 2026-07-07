@@ -158,13 +158,8 @@ const toQueryString = (params: ListQuestionsParams) => {
     searchParams.set('type', params.type);
   }
 
-  if (params.sortBy) {
-    searchParams.set('sortBy', params.sortBy);
-  }
-
-  if (params.sortOrder) {
-    searchParams.set('sortOrder', params.sortOrder);
-  }
+  searchParams.set('sortBy', params.sortBy ?? 'createdAt');
+  searchParams.set('sortOrder', params.sortOrder ?? 'desc');
 
   return searchParams.toString();
 };
