@@ -163,6 +163,7 @@ const formatWrongRateSummary = (stat: WorkbookQuestionStatsApiItem) => {
 };
 
 type AnswerChoice = SubmissionDetailApiItem['answers'][number]['choices'][number];
+type QuestionStatsSortOption = 'wrongRateDesc' | 'wrongRateAsc' | 'questionNumberAsc';
 
 const formatChoiceLabel = (choiceId: string | null, choiceText: string | null, choices: AnswerChoice[]) => {
   if (!choiceId) return '미선택';
@@ -187,6 +188,7 @@ export function ScorePage() {
   const [totalItems, setTotalItems] = useState(0);
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionDetailApiItem | null>(null);
   const [questionStats, setQuestionStats] = useState<WorkbookQuestionStatsApiItem[]>([]);
+  const [questionStatsSort, setQuestionStatsSort] = useState<QuestionStatsSortOption>('wrongRateDesc');
   const [isQuestionStatsOpen, setIsQuestionStatsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isOptionLoading, setIsOptionLoading] = useState(false);
@@ -203,6 +205,20 @@ export function ScorePage() {
   const selectedWorkbook = workbooks.find((workbook) => workbook.id === workbookId);
   const hasSelectedWorkbook = workbookId !== 'all';
   const wrongAnswers = selectedSubmission?.answers.filter((answer) => !answer.isCorrect) ?? [];
+  const sortedQuestionStats = useMemo(() => {
+    return [...questionStats].sort((left, right) => {
+      if (questionStatsSort === 'questionNumberAsc') {
+        return left.questionNumber - right.questionNumber;
+      }
+
+      const wrongRateDiff =
+        questionStatsSort === 'wrongRateDesc'
+          ? right.wrongRate - left.wrongRate
+          : left.wrongRate - right.wrongRate;
+
+      return wrongRateDiff || left.questionNumber - right.questionNumber;
+    });
+  }, [questionStats, questionStatsSort]);
 
   const statCards = [
     {
@@ -314,6 +330,7 @@ export function ScorePage() {
         assignmentId: assignmentId === 'all' ? undefined : assignmentId,
       });
       setQuestionStats(response.data);
+      setQuestionStatsSort('wrongRateDesc');
       setIsQuestionStatsOpen(true);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '문항별 오답률을 불러오지 못했습니다.');
@@ -439,9 +456,22 @@ export function ScorePage() {
                 <h2>문항별 오답률</h2>
                 <p>{selectedWorkbook?.title ?? '선택한 문제집'} 기준 문항별 제출 통계입니다.</p>
               </div>
-              <button className="secondary-button" type="button" onClick={closeQuestionStats}>
-                닫기
-              </button>
+              <div className="toolbar">
+                <label className="search-field">
+                  <span>정렬</span>
+                  <select
+                    value={questionStatsSort}
+                    onChange={(event) => setQuestionStatsSort(event.target.value as QuestionStatsSortOption)}
+                  >
+                    <option value="wrongRateDesc">오답률 높은 순</option>
+                    <option value="wrongRateAsc">오답률 낮은 순</option>
+                    <option value="questionNumberAsc">문제 번호순</option>
+                  </select>
+                </label>
+                <button className="secondary-button" type="button" onClick={closeQuestionStats}>
+                  닫기
+                </button>
+              </div>
             </div>
 
             <div className="table-wrap">
@@ -457,7 +487,7 @@ export function ScorePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {questionStats.map((stat) => (
+                  {sortedQuestionStats.map((stat) => (
                     <tr key={stat.questionId}>
                       <td>{stat.questionNumber}번</td>
                       <td>
