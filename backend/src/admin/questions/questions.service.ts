@@ -139,6 +139,37 @@ export class QuestionsService {
     };
   }
 
+
+  async listFilterOptions() {
+    const [subjectsResult, categoriesResult] = await Promise.all([
+      this.databaseService.getPool().query<{ subject: string }>(
+        `SELECT DISTINCT btrim(subject) AS subject
+         FROM questions
+         WHERE deleted_at IS NULL
+           AND subject IS NOT NULL
+           AND btrim(subject) <> ''`,
+      ),
+      this.databaseService.getPool().query<{ category: string }>(
+        `SELECT DISTINCT btrim(category) AS category
+         FROM questions
+         WHERE deleted_at IS NULL
+           AND category IS NOT NULL
+           AND btrim(category) <> ''`,
+      ),
+    ]);
+
+    return {
+      data: {
+        subjects: subjectsResult.rows
+          .map((row) => row.subject)
+          .sort((left, right) => left.localeCompare(right, 'ko-KR')),
+        categories: categoriesResult.rows
+          .map((row) => row.category)
+          .sort((left, right) => left.localeCompare(right, 'ko-KR')),
+      },
+    };
+  }
+
   async getQuestion(questionId: string) {
     const question = await this.findQuestionById(questionId);
     const choices = await this.getChoices(questionId);

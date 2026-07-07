@@ -60,6 +60,11 @@ export class QuestionsController {
     return this.questionsService.listCategories();
   }
 
+  @Get('filter-options')
+  listFilterOptions() {
+    return this.questionsService.listFilterOptions();
+  }
+
   @Get(':questionId')
   getQuestion(@Param('questionId', ParseUUIDPipe) questionId: string) {
     return this.questionsService.getQuestion(questionId);

@@ -124,29 +124,15 @@ export function QuestionPage() {
       question.correctAnswerIndex < FIXED_CHOICE_COUNT,
   );
 
-  const subjects = useMemo(
-    () => Array.from(new Set([...filterOptions.subjects, ...questions.map((question) => question.subject)])).sort(),
-    [filterOptions.subjects, questions],
-  );
-  const categories = useMemo(
-    () =>
-      Array.from(
-        new Set([...filterOptions.categories, ...questions.map((question) => question.category).filter(Boolean)]),
-      ).sort() as string[],
-    [filterOptions.categories, questions],
-  );
+  const subjects = useMemo(() => filterOptions.subjects, [filterOptions.subjects]);
+  const categories = useMemo(() => filterOptions.categories, [filterOptions.categories]);
 
   const loadFilterOptions = useCallback(async () => {
-    const response = await questionApi.list({
-      page: 1,
-      limit: 100,
-      type: 'multiple_choice',
-    });
-    const rows = response.data.map(toRow);
+    const response = await questionApi.listFilterOptions();
 
     setFilterOptions({
-      subjects: Array.from(new Set(rows.map((question) => question.subject))).sort(),
-      categories: Array.from(new Set(rows.map((question) => question.category).filter(Boolean))).sort() as string[],
+      subjects: response.data.subjects,
+      categories: response.data.categories,
     });
   }, []);
 

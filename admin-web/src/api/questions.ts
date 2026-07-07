@@ -97,6 +97,13 @@ type QuestionCategoriesResponse = {
   data: string[];
 };
 
+type QuestionFilterOptionsResponse = {
+  data: {
+    subjects: string[];
+    categories: string[];
+  };
+};
+
 type PdfQuestionImportPreviewResponse = {
   data: {
     items: PdfQuestionImportPreviewItem[];
@@ -171,6 +178,10 @@ export const questionApi = {
 
   listCategories() {
     return apiRequest<QuestionCategoriesResponse>('/admin/questions/categories');
+  },
+
+  listFilterOptions() {
+    return apiRequest<QuestionFilterOptionsResponse>('/admin/questions/filter-options');
   },
 
   get(questionId: string) {
