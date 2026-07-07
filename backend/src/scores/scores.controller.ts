@@ -27,8 +27,11 @@ export class ScoresController {
 
   @Get('admin/scores/workbooks/:workbookId/question-stats')
   @Roles('admin', 'teacher')
-  getWorkbookQuestionStats(@Param('workbookId', ParseUUIDPipe) workbookId: string) {
-    return this.scoresService.getWorkbookQuestionStats(workbookId);
+  getWorkbookQuestionStats(
+    @Param('workbookId', ParseUUIDPipe) workbookId: string,
+    @Query() query: ListScoresDto,
+  ) {
+    return this.scoresService.getWorkbookQuestionStats(workbookId, query);
   }
 
   @Get('admin/scores/workbooks/:workbookId')
