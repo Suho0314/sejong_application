@@ -29,12 +29,93 @@ const modalPanelStyle: CSSProperties = {
   width: 'min(920px, 100%)',
 };
 
+const wrongAnswerModalPanelStyle: CSSProperties = {
+  ...modalPanelStyle,
+  maxWidth: 1080,
+  width: 'min(1080px, 100%)',
+};
+
+const wrongAnswerSummaryGridStyle: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+  padding: '12px 16px',
+};
+
+const compactStatCardStyle: CSSProperties = {
+  minHeight: 0,
+  padding: '12px 14px 12px 16px',
+};
+
+const compactStatValueStyle: CSSProperties = {
+  display: '-webkit-box',
+  fontSize: 20,
+  lineHeight: 1.15,
+  marginTop: 6,
+  overflow: 'hidden',
+  WebkitBoxOrient: 'vertical',
+  WebkitLineClamp: 2,
+  whiteSpace: 'normal',
+};
+
+const compactStatNoteStyle: CSSProperties = {
+  marginTop: 4,
+};
+
 const questionTextPreviewStyle: CSSProperties = {
   display: '-webkit-box',
   overflow: 'hidden',
   WebkitBoxOrient: 'vertical',
   WebkitLineClamp: 2,
   whiteSpace: 'normal',
+};
+
+const wrongAnswerTableWrapStyle: CSSProperties = {
+  maxHeight: 'min(46vh, 480px)',
+  overflow: 'auto',
+};
+
+const wrongAnswerTableStyle: CSSProperties = {
+  minWidth: 900,
+  tableLayout: 'fixed',
+};
+
+const wrongAnswerHeaderCellStyle: CSSProperties = {
+  padding: '10px 12px',
+};
+
+const wrongAnswerCellStyle: CSSProperties = {
+  padding: '10px 12px',
+  verticalAlign: 'top',
+};
+
+const questionNumberCellStyle: CSSProperties = {
+  ...wrongAnswerCellStyle,
+  width: 74,
+};
+
+const questionContentCellStyle: CSSProperties = {
+  ...wrongAnswerCellStyle,
+  maxWidth: 360,
+  whiteSpace: 'normal',
+  width: '38%',
+};
+
+const answerCellStyle: CSSProperties = {
+  ...wrongAnswerCellStyle,
+  minWidth: 220,
+  whiteSpace: 'normal',
+  width: '26%',
+};
+
+const wrongAnswerTextStyle: CSSProperties = {
+  color: '#B42318',
+  fontWeight: 800,
+};
+
+const correctAnswerTextStyle: CSSProperties = {
+  color: '#057A55',
+  fontWeight: 800,
 };
 
 const formatDate = (value?: string | null) => {
@@ -79,6 +160,17 @@ const formatWrongRateSummary = (stat: WorkbookQuestionStatsApiItem) => {
   }
 
   return `${formatWrongRate(stat.wrongRate)}% / ${stat.answerCount}건`;
+};
+
+type AnswerChoice = SubmissionDetailApiItem['answers'][number]['choices'][number];
+
+const formatChoiceLabel = (choiceId: string | null, choiceText: string | null, choices: AnswerChoice[]) => {
+  if (!choiceId) return '미선택';
+
+  const choiceIndex = choices.findIndex((choice) => choice.id === choiceId);
+  const choiceNumber = choiceIndex >= 0 ? `보기 ${choiceIndex + 1}. ` : '';
+
+  return `${choiceNumber}${choiceText ?? '-'}`;
 };
 
 export function ScorePage() {
@@ -392,11 +484,11 @@ export function ScorePage() {
 
       {selectedSubmission ? (
         <div aria-modal="true" role="dialog" style={modalBackdropStyle}>
-          <section className="dashboard-panel" style={modalPanelStyle}>
+          <section className="dashboard-panel" style={wrongAnswerModalPanelStyle}>
             <div className="panel-header">
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <h2>제출 오답</h2>
-                <p>
+                <p style={questionTextPreviewStyle}>
                   {selectedSubmission.studentName} · {selectedSubmission.cohortName} ·{' '}
                   {selectedSubmission.workbookTitle}
                 </p>
@@ -406,72 +498,80 @@ export function ScorePage() {
               </button>
             </div>
 
-            <div className="stat-grid">
-              <article className="stat-card">
+            <div style={wrongAnswerSummaryGridStyle}>
+              <article className="stat-card" style={compactStatCardStyle}>
                 <span>학생</span>
-                <strong>{selectedSubmission.studentName}</strong>
-                <p>{selectedSubmission.studentNo ?? selectedSubmission.cohortName}</p>
+                <strong style={compactStatValueStyle}>{selectedSubmission.studentName}</strong>
+                <p style={compactStatNoteStyle}>{selectedSubmission.studentNo ?? selectedSubmission.cohortName}</p>
               </article>
-              <article className="stat-card">
+              <article className="stat-card" style={compactStatCardStyle}>
                 <span>문제집</span>
-                <strong>{selectedSubmission.workbookTitle}</strong>
-                <p>{selectedSubmission.cohortName}</p>
+                <strong style={compactStatValueStyle}>{selectedSubmission.workbookTitle}</strong>
+                <p style={compactStatNoteStyle}>{selectedSubmission.cohortName}</p>
               </article>
-              <article className="stat-card">
+              <article className="stat-card" style={compactStatCardStyle}>
                 <span>점수</span>
-                <strong>
+                <strong style={compactStatValueStyle}>
                   {selectedSubmission.earnedPoints}/{selectedSubmission.totalPoints}
                 </strong>
-                <p>{selectedSubmission.score}점</p>
+                <p style={compactStatNoteStyle}>{selectedSubmission.score}점</p>
               </article>
-              <article className="stat-card">
-                <span>정답</span>
-                <strong>{selectedSubmission.correctCount}개</strong>
-                <p>오답 {selectedSubmission.wrongCount}개</p>
-              </article>
-              <article className="stat-card">
-                <span>제출일</span>
-                <strong>{formatDate(selectedSubmission.submittedAt)}</strong>
-                <p>응시 {selectedSubmission.attemptNo}회차</p>
+              <article className="stat-card" style={compactStatCardStyle}>
+                <span>정답/오답</span>
+                <strong style={compactStatValueStyle}>
+                  {selectedSubmission.correctCount} / {selectedSubmission.wrongCount}
+                </strong>
+                <p style={compactStatNoteStyle}>정답 {selectedSubmission.correctCount}개 · 오답 {selectedSubmission.wrongCount}개</p>
               </article>
             </div>
 
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>문제 번호</th>
-                    <th>문제 내용</th>
-                    <th>학생 선택 답</th>
-                    <th>정답</th>
-                    <th>해설</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {wrongAnswers.map((answer) => (
-                    <tr key={answer.id}>
-                      <td>{answer.sequence}번</td>
-                      <td>
-                        <div className="table-title">{answer.questionContent}</div>
-                        <span className="table-subtitle">
-                          {answer.subject} · {answer.category ?? '미분류'}
-                        </span>
-                      </td>
-                      <td>{answer.selectedChoiceText ?? '미선택'}</td>
-                      <td>{answer.correctChoiceText ?? '-'}</td>
-                      <td>{answer.explanation?.trim() || '-'}</td>
-                    </tr>
-                  ))}
-                  {wrongAnswers.length === 0 ? (
+            {wrongAnswers.length === 0 ? (
+              <p className="empty-cell">틀린 문제가 없습니다.</p>
+            ) : (
+              <div className="table-wrap" style={wrongAnswerTableWrapStyle}>
+                <table style={wrongAnswerTableStyle}>
+                  <colgroup>
+                    <col style={{ width: 74 }} />
+                    <col style={{ width: '38%' }} />
+                    <col style={{ width: '31%' }} />
+                    <col style={{ width: '31%' }} />
+                  </colgroup>
+                  <thead>
                     <tr>
-                      <td className="empty-cell" colSpan={5}>
-                        틀린 문제가 없습니다.
-                      </td>
+                      <th style={wrongAnswerHeaderCellStyle}>문제 번호</th>
+                      <th style={wrongAnswerHeaderCellStyle}>문제 내용</th>
+                      <th style={wrongAnswerHeaderCellStyle}>학생 선택 답</th>
+                      <th style={wrongAnswerHeaderCellStyle}>정답</th>
                     </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {wrongAnswers.map((answer) => (
+                      <tr key={answer.id}>
+                        <td style={questionNumberCellStyle}>{answer.sequence}번</td>
+                        <td style={questionContentCellStyle}>
+                          <div className="table-title" style={questionTextPreviewStyle}>
+                            {answer.questionContent}
+                          </div>
+                          <span className="table-subtitle">
+                            {answer.subject} · {answer.category ?? '미분류'}
+                          </span>
+                        </td>
+                        <td style={answerCellStyle}>
+                          <div style={{ ...questionTextPreviewStyle, ...wrongAnswerTextStyle }}>
+                            {formatChoiceLabel(answer.selectedChoiceId, answer.selectedChoiceText, answer.choices)}
+                          </div>
+                        </td>
+                        <td style={answerCellStyle}>
+                          <div style={{ ...questionTextPreviewStyle, ...correctAnswerTextStyle }}>
+                            {formatChoiceLabel(answer.correctChoiceId, answer.correctChoiceText, answer.choices)}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
         </div>
       ) : null}
