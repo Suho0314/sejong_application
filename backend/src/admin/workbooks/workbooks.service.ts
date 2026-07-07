@@ -59,7 +59,9 @@ export class WorkbooksService {
         `${this.baseWorkbookSelectSql()}
          WHERE ${whereSql}
          GROUP BY workbooks.id
-         ORDER BY workbooks.created_at DESC
+         ORDER BY lower(btrim(workbooks.title)) ASC,
+                  workbooks.created_at ASC,
+                  workbooks.id ASC
          LIMIT $${limitParam}
          OFFSET $${offsetParam}`,
         dataValues,
