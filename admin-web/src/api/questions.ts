@@ -180,8 +180,17 @@ export const questionApi = {
     return apiRequest<QuestionCategoriesResponse>('/admin/questions/categories');
   },
 
-  listFilterOptions() {
-    return apiRequest<QuestionFilterOptionsResponse>('/admin/questions/filter-options');
+  listFilterOptions(params?: { status?: ContentStatus }) {
+    const searchParams = new URLSearchParams();
+
+    if (params?.status) {
+      searchParams.set('status', params.status);
+    }
+
+    const queryString = searchParams.toString();
+    return apiRequest<QuestionFilterOptionsResponse>(
+      `/admin/questions/filter-options${queryString ? `?${queryString}` : ''}`,
+    );
   },
 
   get(questionId: string) {

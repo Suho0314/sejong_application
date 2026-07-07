@@ -24,6 +24,7 @@ import { BulkUpdateQuestionCategoryDto } from './dto/bulk-update-question-catego
 import { BulkUpdateQuestionStatusDto } from './dto/bulk-update-question-status.dto';
 import { ConfirmPdfQuestionImportDto } from './dto/confirm-pdf-question-import.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
+import { ListQuestionFilterOptionsDto } from './dto/list-question-filter-options.dto';
 import { ListQuestionsDto } from './dto/list-questions.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { QuestionPdfImportService } from './question-pdf-import.service';
@@ -61,8 +62,8 @@ export class QuestionsController {
   }
 
   @Get('filter-options')
-  listFilterOptions() {
-    return this.questionsService.listFilterOptions();
+  listFilterOptions(@Query() query: ListQuestionFilterOptionsDto) {
+    return this.questionsService.listFilterOptions(query);
   }
 
   @Get(':questionId')

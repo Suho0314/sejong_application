@@ -9,6 +9,7 @@ import { ContentStatus } from '../../../types/domain';
 
 const WORKBOOK_PAGE_SIZE = 5;
 const QUESTION_LIMIT = 100;
+const QUESTION_CANDIDATE_STATUS: ContentStatus = 'published';
 const WORKBOOK_TOTAL_SCORE = 100;
 
 type QuestionRow = {
@@ -232,6 +233,7 @@ export function WorkbookPage() {
         keyword: questionKeyword,
         subject: subjectFilter === 'all' ? undefined : subjectFilter,
         category: categoryFilter === 'all' ? undefined : categoryFilter,
+        status: QUESTION_CANDIDATE_STATUS,
         type: 'multiple_choice',
       });
 
@@ -245,17 +247,10 @@ export function WorkbookPage() {
   }, [categoryFilter, questionKeyword, subjectFilter]);
 
   const loadQuestionFilterOptions = useCallback(async () => {
-    const [questionsResponse, categoriesResponse] = await Promise.all([
-      questionApi.list({
-        page: 1,
-        limit: QUESTION_LIMIT,
-        type: 'multiple_choice',
-      }),
-      questionApi.listCategories(),
-    ]);
+    const response = await questionApi.listFilterOptions({ status: QUESTION_CANDIDATE_STATUS });
 
-    setQuestionSubjects(Array.from(new Set(questionsResponse.data.map((question) => question.subject))).sort());
-    setQuestionCategories(categoriesResponse.data);
+    setQuestionSubjects(response.data.subjects);
+    setQuestionCategories(response.data.categories);
   }, []);
 
   useEffect(() => {

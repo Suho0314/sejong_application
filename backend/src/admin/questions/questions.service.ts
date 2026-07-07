@@ -9,6 +9,7 @@ import { DatabaseService } from '../../database/database.service';
 import { BulkUpdateQuestionCategoryDto } from './dto/bulk-update-question-category.dto';
 import { BulkUpdateQuestionStatusDto } from './dto/bulk-update-question-status.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
+import { ListQuestionFilterOptionsDto } from './dto/list-question-filter-options.dto';
 import { ListQuestionsDto } from './dto/list-questions.dto';
 import { QuestionChoiceDto } from './dto/question-choice.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
@@ -140,21 +141,32 @@ export class QuestionsService {
   }
 
 
-  async listFilterOptions() {
+  async listFilterOptions(query: ListQuestionFilterOptionsDto = {}) {
+    const values: string[] = [];
+    const whereClauses = ['deleted_at IS NULL'];
+
+    if (query.status) {
+      values.push(query.status);
+      whereClauses.push(`status = $${values.length}`);
+    }
+
+    const whereSql = whereClauses.join(' AND ');
     const [subjectsResult, categoriesResult] = await Promise.all([
       this.databaseService.getPool().query<{ subject: string }>(
         `SELECT DISTINCT btrim(subject) AS subject
          FROM questions
-         WHERE deleted_at IS NULL
+         WHERE ${whereSql}
            AND subject IS NOT NULL
            AND btrim(subject) <> ''`,
+        values,
       ),
       this.databaseService.getPool().query<{ category: string }>(
         `SELECT DISTINCT btrim(category) AS category
          FROM questions
-         WHERE deleted_at IS NULL
+         WHERE ${whereSql}
            AND category IS NOT NULL
            AND btrim(category) <> ''`,
+        values,
       ),
     ]);
 
