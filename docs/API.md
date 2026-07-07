@@ -1140,7 +1140,7 @@ Response:
 
 Query parameters: `type`, `difficulty`, `subject`, `category`, `status`, `keyword`, `page`, `limit`
 
-- `category`는 앞뒤 공백을 제거한 뒤 `questions.category`와 정확히 일치하는 문제만 조회한다.
+- `subject`, `category` 필터는 모든 공백 문자를 제거한 값으로 정규화한 뒤 문제의 정규화된 `questions.subject`, `questions.category`와 정확히 일치하는 문제만 조회한다.
 - `keyword`, `status`, `subject`, `difficulty`, `type`, `page`, `limit`과 함께 조합해 사용할 수 있다. 단, Admin Web 화면에서는 `difficulty` 필터를 제공하지 않는다.
 
 Example: `GET /api/admin/questions?type=multiple_choice&subject=기본간호학&category=활력징후&page=1&limit=20`
@@ -1208,8 +1208,8 @@ Response:
 조회 기준:
 
 - `deleted_at IS NULL` 문제만 기준으로 한다.
-- `subject`, `category`가 `NULL`, 빈 문자열, 공백만 있는 값은 목록에서 제외한다.
-- 앞뒤 공백을 제거한 값으로 중복 제거한다.
+- `subject`, `category`는 모든 공백 문자를 제거한 값으로 정규화해 중복 제거한다.
+- 정규화 후 `NULL`, 빈 문자열, 공백만 있는 값은 목록에서 제외한다.
 - 응답 배열은 한글 가나다순으로 정렬한다.
 - `status` query parameter를 생략하면 상태(`draft`, `published`, `archived`)와 무관하게 실제 존재하는 값을 포함한다.
 - 문제집 편집 화면의 후보 문제 필터는 `status=published`를 사용해 새 문제집에 추가 가능한 문제 기준의 과목/카테고리만 표시한다.
@@ -1242,12 +1242,14 @@ Response:
 조회 기준:
 
 - `deleted_at IS NULL` 문제만 기준으로 한다.
-- `category`가 `NULL`, 빈 문자열, 공백만 있는 문제는 목록에서 제외한다.
-- 카테고리는 앞뒤 공백을 제거한 값으로 중복 제거한다.
+- `category`는 모든 공백 문자를 제거한 값으로 정규화해 중복 제거한다.
+- 정규화 후 `NULL`, 빈 문자열, 공백만 있는 문제는 목록에서 제외한다.
 - 응답 배열은 한글 가나다순으로 정렬한다.
 - 카테고리가 없는 문제는 문제 목록에는 계속 표시되지만, 별도 `미분류` 필터는 제공하지 않는다.
 
 ### 문제 생성
+
+`subject`와 `category`는 저장 시 모든 공백 문자(스페이스, 탭, 줄바꿈 등)를 제거한 값으로 정규화한다. `subject`는 필수값이므로 정규화 후 빈 값이면 실패하며, 선택값인 `category`는 정규화 후 빈 값이면 `null`로 저장한다.
 
 | 항목 | 내용 |
 | --- | --- |
@@ -1336,6 +1338,8 @@ Response:
 ```
 
 ### 문제 수정
+
+`subject`와 `category`는 생성과 동일하게 저장 시 모든 공백 문자를 제거한 값으로 정규화한다. `subject`를 전달한 경우 정규화 후 빈 값이면 실패하며, `category`는 정규화 후 빈 값이면 `null`로 저장한다.
 
 | 항목 | 내용 |
 | --- | --- |
@@ -1462,7 +1466,7 @@ Response:
 
 - `questionIds`는 1개 이상의 UUID 배열이어야 하며 중복 ID는 허용하지 않는다.
 - 존재하지 않거나 삭제된 문제가 하나라도 포함되면 전체 변경을 실패 처리한다.
-- `category`는 앞뒤 공백을 제거해 저장한다.
+- `category`는 모든 공백 문자를 제거한 값으로 저장한다.
 - `category`는 빈 문자열 또는 공백만 있는 문자열일 수 없다.
 - `category`는 단건 문제 생성·수정과 동일하게 최대 120자까지 허용한다.
 - 카테고리 변경은 문제 상태를 자동으로 변경하지 않으며, 문제집 문항 선택 가능 정책은 기존 `published` 상태 기준을 유지한다.

@@ -8,7 +8,7 @@ export class BulkUpdateQuestionCategoryDto {
   @IsUUID('4', { each: true })
   questionIds!: string[];
 
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @Transform(({ value }) => (typeof value === 'string' ? value.replace(/\s+/g, '') : value))
   @IsString()
   @IsNotEmpty()
   @MaxLength(120)

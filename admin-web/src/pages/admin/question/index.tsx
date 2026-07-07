@@ -33,6 +33,7 @@ const importStatusLabels: Record<EditablePdfImportQuestion['status'], string> = 
 };
 
 const DEFAULT_IMPORT_SUBJECT = 'PDF 가져오기';
+const normalizeTaxonomyInput = (value: string) => value.replace(/\s+/g, '');
 const FIXED_CHOICE_COUNT = 5;
 
 const normalizeFixedChoices = (choices: string[]) =>
@@ -67,8 +68,8 @@ const toFormValues = (question: QuestionRow): QuestionFormValues => ({
 });
 
 const toPayload = (values: QuestionFormValues): QuestionPayload => ({
-  subject: values.subject.trim(),
-  category: values.category.trim() || null,
+  subject: normalizeTaxonomyInput(values.subject),
+  category: normalizeTaxonomyInput(values.category) || null,
   type: 'multiple_choice',
   content: values.content.trim(),
   choices: normalizeFixedChoices(values.choices).map((choice) => choice.trim()),
@@ -273,7 +274,7 @@ export function QuestionPage() {
   };
 
   const handleBulkUpdateCategory = async () => {
-    const nextCategory = bulkCategory.trim();
+    const nextCategory = normalizeTaxonomyInput(bulkCategory);
 
     if (selectedQuestionCount === 0 || !nextCategory) return;
 
@@ -382,8 +383,8 @@ export function QuestionPage() {
         permissionConfirmed,
         selectedImportQuestions.map((question) => ({
           questionNumber: question.questionNumber,
-          subject: question.subject.trim() || DEFAULT_IMPORT_SUBJECT,
-          category: question.category?.trim() || null,
+          subject: normalizeTaxonomyInput(question.subject) || DEFAULT_IMPORT_SUBJECT,
+          category: question.category ? normalizeTaxonomyInput(question.category) || null : null,
           content: question.content.trim(),
           choices: normalizeFixedChoices(question.choices).map((choice) => choice.trim()),
           correctAnswerIndex: question.correctAnswerIndex ?? 0,
@@ -779,7 +780,7 @@ export function QuestionPage() {
           </label>
           <button
             className="secondary-button"
-            disabled={selectedQuestionCount === 0 || isBulkCategoryUpdating || !bulkCategory.trim()}
+            disabled={selectedQuestionCount === 0 || isBulkCategoryUpdating || !normalizeTaxonomyInput(bulkCategory)}
             type="button"
             onClick={() => void handleBulkUpdateCategory()}
           >

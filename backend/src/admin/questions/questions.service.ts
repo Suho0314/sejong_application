@@ -23,6 +23,7 @@ import {
 
 const FIXED_CHOICE_COUNT = 5;
 const DEFAULT_DIFFICULTY = 'medium' as const;
+const TAXONOMY_WHITESPACE_PATTERN = /\s+/g;
 
 @Injectable()
 export class QuestionsService {
@@ -55,14 +56,20 @@ export class QuestionsService {
       whereClauses.push(`questions.type = $${values.length}`);
     }
 
-    if (query.subject?.trim()) {
-      values.push(query.subject.trim());
-      whereClauses.push(`questions.subject = $${values.length}`);
+    const subjectFilter = this.normalizeOptionalTaxonomyValue(query.subject);
+    if (subjectFilter) {
+      values.push(subjectFilter);
+      whereClauses.push(
+        `regexp_replace(questions.subject, '[[:space:]]+', '', 'g') = $${values.length}`,
+      );
     }
 
-    if (query.category?.trim()) {
-      values.push(query.category.trim());
-      whereClauses.push(`questions.category = $${values.length}`);
+    const categoryFilter = this.normalizeOptionalTaxonomyValue(query.category);
+    if (categoryFilter) {
+      values.push(categoryFilter);
+      whereClauses.push(
+        `regexp_replace(questions.category, '[[:space:]]+', '', 'g') = $${values.length}`,
+      );
     }
 
     if (query.status) {
@@ -112,6 +119,39 @@ export class QuestionsService {
     };
   }
 
+  private normalizeTaxonomyWhitespace(value: string): string {
+    return value.replace(TAXONOMY_WHITESPACE_PATTERN, '');
+  }
+
+  private normalizeOptionalTaxonomyValue(value: string | null | undefined): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    const normalized = this.normalizeTaxonomyWhitespace(value);
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private normalizeRequiredTaxonomyValue(
+    value: string | null | undefined,
+    code: string,
+    message: string,
+  ): string {
+    const normalized = this.normalizeOptionalTaxonomyValue(value);
+
+    if (!normalized) {
+      throw new UnprocessableEntityException({
+        error: {
+          code,
+          message,
+          details: [],
+        },
+      });
+    }
+
+    return normalized;
+  }
+
   private resolveListOrderSql(query: ListQuestionsDto): string {
     const sortBy = query.sortBy ?? 'createdAt';
     const sortOrder = query.sortOrder ?? 'desc';
@@ -126,11 +166,10 @@ export class QuestionsService {
 
   async listCategories() {
     const result = await this.databaseService.getPool().query<{ category: string }>(
-      `SELECT DISTINCT btrim(category) AS category
+      `SELECT DISTINCT NULLIF(regexp_replace(category, '[[:space:]]+', '', 'g'), '') AS category
        FROM questions
        WHERE deleted_at IS NULL
-         AND category IS NOT NULL
-         AND btrim(category) <> ''`,
+         AND NULLIF(regexp_replace(category, '[[:space:]]+', '', 'g'), '') IS NOT NULL`,
     );
 
     return {
@@ -139,7 +178,6 @@ export class QuestionsService {
         .sort((left, right) => left.localeCompare(right, 'ko-KR')),
     };
   }
-
 
   async listFilterOptions(query: ListQuestionFilterOptionsDto = {}) {
     const values: string[] = [];
@@ -153,19 +191,17 @@ export class QuestionsService {
     const whereSql = whereClauses.join(' AND ');
     const [subjectsResult, categoriesResult] = await Promise.all([
       this.databaseService.getPool().query<{ subject: string }>(
-        `SELECT DISTINCT btrim(subject) AS subject
+        `SELECT DISTINCT NULLIF(regexp_replace(subject, '[[:space:]]+', '', 'g'), '') AS subject
          FROM questions
          WHERE ${whereSql}
-           AND subject IS NOT NULL
-           AND btrim(subject) <> ''`,
+           AND NULLIF(regexp_replace(subject, '[[:space:]]+', '', 'g'), '') IS NOT NULL`,
         values,
       ),
       this.databaseService.getPool().query<{ category: string }>(
-        `SELECT DISTINCT btrim(category) AS category
+        `SELECT DISTINCT NULLIF(regexp_replace(category, '[[:space:]]+', '', 'g'), '') AS category
          FROM questions
          WHERE ${whereSql}
-           AND category IS NOT NULL
-           AND btrim(category) <> ''`,
+           AND NULLIF(regexp_replace(category, '[[:space:]]+', '', 'g'), '') IS NOT NULL`,
         values,
       ),
     ]);
@@ -200,6 +236,12 @@ export class QuestionsService {
     }
 
     const content = this.resolveContent(body.content, body.stem);
+    const subject = this.normalizeRequiredTaxonomyValue(
+      body.subject,
+      'QUESTION_SUBJECT_REQUIRED',
+      '과목을 입력해주세요.',
+    );
+    const category = this.normalizeOptionalTaxonomyValue(body.category);
     const questionType = this.resolveQuestionType(body.type, body.questionType);
     const answerIndex = this.resolveAnswerIndex(body.correctAnswerIndex, body.answerKey);
     this.assertExactChoiceCount(body.choices.length);
@@ -236,8 +278,8 @@ export class QuestionsService {
            updated_at`,
         [
           createdBy,
-          body.subject,
-          body.category ?? null,
+          subject,
+          category,
           body.difficulty ?? DEFAULT_DIFFICULTY,
           questionType,
           content,
@@ -261,6 +303,18 @@ export class QuestionsService {
 
   async updateQuestion(questionId: string, body: UpdateQuestionDto) {
     const current = await this.findQuestionById(questionId);
+    const subject =
+      body.subject === undefined
+        ? null
+        : this.normalizeRequiredTaxonomyValue(
+            body.subject,
+            'QUESTION_SUBJECT_REQUIRED',
+            '과목을 입력해주세요.',
+          );
+    const category =
+      body.category === undefined
+        ? current.category
+        : this.normalizeOptionalTaxonomyValue(body.category);
     const nextChoiceCount = body.choices?.length ?? (await this.getChoices(questionId)).length;
     const nextAnswerIndex =
       body.correctAnswerIndex ?? body.answerKey ?? current.correct_answer_index;
@@ -304,8 +358,8 @@ export class QuestionsService {
            updated_at`,
         [
           questionId,
-          body.subject ?? null,
-          body.category === undefined ? current.category : body.category,
+          subject,
+          category,
           body.difficulty ?? null,
           body.type ?? body.questionType ?? null,
           this.optionalContent(body.content, body.stem),
@@ -331,7 +385,11 @@ export class QuestionsService {
 
   async bulkUpdateQuestionCategory(body: BulkUpdateQuestionCategoryDto) {
     const uniqueQuestionIds = Array.from(new Set(body.questionIds));
-    const category = body.category.trim();
+    const category = this.normalizeRequiredTaxonomyValue(
+      body.category,
+      'QUESTION_CATEGORY_REQUIRED',
+      '카테고리를 입력해주세요.',
+    );
 
     if (uniqueQuestionIds.length === 0) {
       throw new UnprocessableEntityException({
