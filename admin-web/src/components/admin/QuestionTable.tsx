@@ -10,6 +10,10 @@ export type QuestionRow = {
   content: string;
   choices: string[];
   correctAnswerIndex: number;
+  answerCount: number;
+  correctCount: number;
+  wrongCount: number;
+  wrongRate: number;
   status: ContentStatus;
   createdAt: string;
   updatedAt: string;
@@ -38,6 +42,19 @@ const contentPreviewStyle: CSSProperties = {
   WebkitBoxOrient: 'vertical',
   WebkitLineClamp: 2,
   whiteSpace: 'normal',
+};
+
+const formatWrongRate = (wrongRate: number) =>
+  new Intl.NumberFormat('ko-KR', {
+    maximumFractionDigits: 1,
+  }).format(wrongRate);
+
+const formatWrongRateSummary = (question: QuestionRow) => {
+  if (question.answerCount === 0) {
+    return '- / 0건';
+  }
+
+  return `${formatWrongRate(question.wrongRate)}% / ${question.answerCount}건`;
 };
 
 export function QuestionTable({
@@ -70,6 +87,7 @@ export function QuestionTable({
             <th>카테고리</th>
             <th>상태</th>
             <th>정답</th>
+            <th>오답률</th>
             <th>생성일</th>
             <th>수정</th>
             <th>삭제</th>
@@ -101,6 +119,7 @@ export function QuestionTable({
                 <span className={`status-pill status-${question.status}`}>{QuestionStatusLabel[question.status]}</span>
               </td>
               <td>보기 {question.correctAnswerIndex + 1}</td>
+              <td>{formatWrongRateSummary(question)}</td>
               <td>{formatDate(question.createdAt)}</td>
               <td>
                 <button className="text-button" type="button" onClick={() => onEdit(question)}>
@@ -116,7 +135,7 @@ export function QuestionTable({
           ))}
           {questions.length === 0 ? (
             <tr>
-              <td className="empty-cell" colSpan={9}>
+              <td className="empty-cell" colSpan={10}>
                 검색 결과가 없습니다.
               </td>
             </tr>

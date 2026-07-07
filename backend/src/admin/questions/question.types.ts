@@ -19,6 +19,10 @@ export type QuestionRow = {
   status: QuestionStatus;
   created_at: Date;
   updated_at: Date;
+  answer_count?: number | string | null;
+  correct_count?: number | string | null;
+  wrong_count?: number | string | null;
+  wrong_rate?: number | string | null;
 };
 
 export type ChoiceRow = {
@@ -39,6 +43,10 @@ export type QuestionResponse = {
   choices: QuestionChoice[];
   correctAnswerIndex: number;
   answerKey: number;
+  answerCount: number;
+  correctCount: number;
+  wrongCount: number;
+  wrongRate: number;
   status: QuestionStatus;
   createdAt: string;
   updatedAt: string;

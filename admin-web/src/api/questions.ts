@@ -16,6 +16,10 @@ export type QuestionApiItem = {
   choices: QuestionChoiceApiItem[];
   correctAnswerIndex: number;
   answerKey: number;
+  answerCount: number;
+  correctCount: number;
+  wrongCount: number;
+  wrongRate: number;
   status: ContentStatus;
   createdAt: string;
   updatedAt: string;

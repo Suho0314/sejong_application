@@ -488,8 +488,28 @@ export class QuestionsService {
       questions.correct_answer_index,
       questions.status,
       questions.created_at,
-      questions.updated_at
-    FROM questions`;
+      questions.updated_at,
+      COALESCE(question_answer_stats.answer_count, 0)::int AS answer_count,
+      COALESCE(question_answer_stats.correct_count, 0)::int AS correct_count,
+      COALESCE(question_answer_stats.wrong_count, 0)::int AS wrong_count,
+      CASE
+        WHEN COALESCE(question_answer_stats.answer_count, 0) = 0 THEN 0
+        ELSE ROUND(
+          (question_answer_stats.wrong_count::numeric / question_answer_stats.answer_count::numeric) * 100,
+          1
+        )::float
+      END AS wrong_rate
+    FROM questions
+    LEFT JOIN (
+      SELECT
+        question_id,
+        COUNT(*)::int AS answer_count,
+        COUNT(*) FILTER (WHERE is_correct)::int AS correct_count,
+        COUNT(*) FILTER (WHERE NOT is_correct)::int AS wrong_count
+      FROM submission_answers
+      WHERE deleted_at IS NULL
+      GROUP BY question_id
+    ) question_answer_stats ON question_answer_stats.question_id = questions.id`;
   }
 
   private async findQuestionById(questionId: string): Promise<QuestionRow> {
@@ -611,6 +631,10 @@ export class QuestionsService {
       })),
       correctAnswerIndex: row.correct_answer_index,
       answerKey: row.correct_answer_index,
+      answerCount: Number(row.answer_count ?? 0),
+      correctCount: Number(row.correct_count ?? 0),
+      wrongCount: Number(row.wrong_count ?? 0),
+      wrongRate: Number(row.wrong_rate ?? 0),
       status: row.status,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
