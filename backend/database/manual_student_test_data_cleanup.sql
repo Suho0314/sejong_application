@@ -1,0 +1,87 @@
+-- Manual one-time cleanup guide for legacy student test accounts.
+-- DO NOT run this file without a fresh production backup and instructor approval.
+-- This file is not referenced by application startup or migrations.
+
+-- Scope:
+-- - Delete or soft-delete only legacy student users and their dependent learning data.
+-- - Do not delete teachers, cohorts, questions, workbooks, workbook assignments,
+--   or any instructor/admin account.
+--
+-- Expected dependent data:
+-- - submission_answers -> submissions
+-- - workbook_progress_answers -> workbook_progresses
+-- - submissions
+-- - workbook_progresses
+-- - students
+-- - student users only
+--
+-- Pre-check examples:
+-- SELECT students.id, users.login_id, users.name, students.status
+-- FROM students
+-- JOIN users ON users.id = students.user_id
+-- WHERE users.role = 'student' AND students.deleted_at IS NULL;
+--
+-- Recommended execution policy:
+-- 1. Export/backup the database.
+-- 2. Review the exact student IDs to remove.
+-- 3. Replace the VALUES list below with approved student IDs.
+-- 4. Run inside a transaction.
+-- 5. Verify affected row counts before COMMIT.
+--
+-- BEGIN;
+--
+-- WITH target_students(student_id) AS (
+--   VALUES
+--     ('00000000-0000-0000-0004-000000000001'::uuid)
+-- ),
+-- deleted_submission_answers AS (
+--   UPDATE submission_answers
+--   SET deleted_at = now(), updated_at = now()
+--   WHERE submission_id IN (
+--     SELECT submissions.id
+--     FROM submissions
+--     JOIN target_students ON target_students.student_id = submissions.student_id
+--   )
+--   AND deleted_at IS NULL
+--   RETURNING id
+-- ),
+-- deleted_submissions AS (
+--   UPDATE submissions
+--   SET deleted_at = now(), updated_at = now()
+--   WHERE student_id IN (SELECT student_id FROM target_students)
+--   AND deleted_at IS NULL
+--   RETURNING id
+-- ),
+-- deleted_progress_answers AS (
+--   UPDATE workbook_progress_answers
+--   SET deleted_at = now(), updated_at = now()
+--   WHERE workbook_progress_id IN (
+--     SELECT workbook_progresses.id
+--     FROM workbook_progresses
+--     JOIN target_students ON target_students.student_id = workbook_progresses.student_id
+--   )
+--   AND deleted_at IS NULL
+--   RETURNING id
+-- ),
+-- deleted_progresses AS (
+--   UPDATE workbook_progresses
+--   SET deleted_at = now(), updated_at = now(), is_active = FALSE
+--   WHERE student_id IN (SELECT student_id FROM target_students)
+--   AND deleted_at IS NULL
+--   RETURNING id
+-- ),
+-- deleted_students AS (
+--   UPDATE students
+--   SET deleted_at = now(), updated_at = now()
+--   WHERE id IN (SELECT student_id FROM target_students)
+--   AND deleted_at IS NULL
+--   RETURNING user_id
+-- )
+-- UPDATE users
+-- SET deleted_at = now(), updated_at = now()
+-- WHERE id IN (SELECT user_id FROM deleted_students)
+-- AND role = 'student'
+-- AND deleted_at IS NULL;
+--
+-- -- Verify, then COMMIT or ROLLBACK.
+-- ROLLBACK;
