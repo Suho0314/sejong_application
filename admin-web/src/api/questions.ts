@@ -33,6 +33,8 @@ export type ListQuestionsParams = {
   category?: string;
   status?: ContentStatus;
   type?: QuestionType;
+  sortBy?: 'createdAt' | 'wrongRate';
+  sortOrder?: 'asc' | 'desc';
 };
 
 export type QuestionPayload = {
@@ -154,6 +156,14 @@ const toQueryString = (params: ListQuestionsParams) => {
 
   if (params.type) {
     searchParams.set('type', params.type);
+  }
+
+  if (params.sortBy) {
+    searchParams.set('sortBy', params.sortBy);
+  }
+
+  if (params.sortOrder) {
+    searchParams.set('sortOrder', params.sortOrder);
   }
 
   return searchParams.toString();

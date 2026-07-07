@@ -20,6 +20,7 @@ type QuestionFilterOption = {
 
 type QuestionFilter = 'all' | string;
 type StatusFilter = 'all' | ContentStatus;
+type SortOption = 'latest' | 'wrongRateDesc' | 'wrongRateAsc';
 
 type EditablePdfImportQuestion = PdfQuestionImportPreviewItem & {
   included: boolean;
@@ -85,6 +86,7 @@ export function QuestionPage() {
   const [subject, setSubject] = useState<QuestionFilter>('all');
   const [category, setCategory] = useState<QuestionFilter>('all');
   const [status, setStatus] = useState<StatusFilter>('all');
+  const [sortOption, setSortOption] = useState<SortOption>('latest');
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [editingQuestion, setEditingQuestion] = useState<QuestionRow | null>(null);
@@ -161,6 +163,8 @@ export function QuestionPage() {
         category: category === 'all' ? undefined : category,
         status: status === 'all' ? undefined : status,
         type: 'multiple_choice',
+        sortBy: sortOption === 'latest' ? 'createdAt' : 'wrongRate',
+        sortOrder: sortOption === 'wrongRateAsc' ? 'asc' : 'desc',
       });
 
       setQuestions(response.data.map(toRow));
@@ -174,7 +178,7 @@ export function QuestionPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [category, keyword, page, status, subject]);
+  }, [category, keyword, page, sortOption, status, subject]);
 
   useEffect(() => {
     loadFilterOptions().catch((error) => {
@@ -211,11 +215,17 @@ export function QuestionPage() {
     setPage(1);
   };
 
+  const handleSortChange = (value: SortOption) => {
+    setSortOption(value);
+    setPage(1);
+  };
+
   const resetFilters = () => {
     setKeyword('');
     setSubject('all');
     setCategory('all');
     setStatus('all');
+    setSortOption('latest');
     setPage(1);
     setSelectedQuestionIds(new Set());
   };
@@ -726,6 +736,14 @@ export function QuestionPage() {
                   {option.label}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="search-field">
+            <span>정렬</span>
+            <select value={sortOption} onChange={(event) => handleSortChange(event.target.value as SortOption)}>
+              <option value="latest">최신순</option>
+              <option value="wrongRateDesc">오답률 높은 순</option>
+              <option value="wrongRateAsc">오답률 낮은 순</option>
             </select>
           </label>
           <button className="secondary-button" type="button" onClick={resetFilters}>
