@@ -65,6 +65,8 @@ type WorkbookQuestionStatsResponse = {
   data: WorkbookQuestionStatsApiItem[];
 };
 
+type WorkbookQuestionStatsParams = Pick<ListScoresParams, 'cohortId' | 'assignmentId'>;
+
 const toQueryString = (params: ListScoresParams) => {
   const searchParams = new URLSearchParams();
 
@@ -79,12 +81,26 @@ const toQueryString = (params: ListScoresParams) => {
   return searchParams.toString();
 };
 
+const toWorkbookQuestionStatsQueryString = (params: WorkbookQuestionStatsParams = {}) => {
+  const searchParams = new URLSearchParams();
+
+  if (params.cohortId) searchParams.set('cohortId', params.cohortId);
+  if (params.assignmentId) searchParams.set('assignmentId', params.assignmentId);
+
+  return searchParams.toString();
+};
+
 export const scoreApi = {
   list(params: ListScoresParams) {
     return apiRequest<ScoreListResponse>(`/admin/scores?${toQueryString(params)}`);
   },
 
-  getWorkbookQuestionStats(workbookId: string) {
-    return apiRequest<WorkbookQuestionStatsResponse>(`/admin/scores/workbooks/${workbookId}/question-stats`);
+  getWorkbookQuestionStats(workbookId: string, params?: WorkbookQuestionStatsParams) {
+    const queryString = toWorkbookQuestionStatsQueryString(params);
+    const querySuffix = queryString ? `?${queryString}` : '';
+
+    return apiRequest<WorkbookQuestionStatsResponse>(
+      `/admin/scores/workbooks/${workbookId}/question-stats${querySuffix}`,
+    );
   },
 };

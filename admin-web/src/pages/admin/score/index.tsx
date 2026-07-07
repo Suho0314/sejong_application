@@ -309,7 +309,10 @@ export function ScorePage() {
     setErrorMessage('');
 
     try {
-      const response = await scoreApi.getWorkbookQuestionStats(workbookId);
+      const response = await scoreApi.getWorkbookQuestionStats(workbookId, {
+        cohortId: cohortId === 'all' ? undefined : cohortId,
+        assignmentId: assignmentId === 'all' ? undefined : assignmentId,
+      });
       setQuestionStats(response.data);
       setIsQuestionStatsOpen(true);
     } catch (error) {

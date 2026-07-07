@@ -84,8 +84,23 @@ export class ScoresService {
     };
   }
 
-  async getWorkbookQuestionStats(workbookId: string) {
+  async getWorkbookQuestionStats(workbookId: string, query: Pick<ListScoresDto, 'cohortId' | 'assignmentId'> = {}) {
     await this.assertWorkbookExists(workbookId);
+    const statsValues: string[] = [workbookId];
+    const statsWhereClauses = [
+      'submissions.deleted_at IS NULL',
+      'submissions.workbook_id = $1',
+    ];
+
+    if (query.cohortId) {
+      statsValues.push(query.cohortId);
+      statsWhereClauses.push(`workbook_assignments.cohort_id = $${statsValues.length}`);
+    }
+
+    if (query.assignmentId) {
+      statsValues.push(query.assignmentId);
+      statsWhereClauses.push(`submissions.workbook_assignment_id = $${statsValues.length}`);
+    }
 
     const result = await this.databaseService.getPool().query<WorkbookQuestionStatsRow>(
       `SELECT
@@ -115,16 +130,18 @@ export class ScoresService {
          FROM submission_answers
          JOIN submissions
            ON submissions.id = submission_answers.submission_id
-          AND submissions.deleted_at IS NULL
-          AND submissions.workbook_id = $1
-         WHERE submission_answers.deleted_at IS NULL
-         GROUP BY submission_answers.workbook_question_id
-       ) answer_stats
+         JOIN workbook_assignments
+           ON workbook_assignments.id = submissions.workbook_assignment_id
+         AND workbook_assignments.deleted_at IS NULL
+       WHERE ${statsWhereClauses.join(' AND ')}
+         AND submission_answers.deleted_at IS NULL
+       GROUP BY submission_answers.workbook_question_id
+      ) answer_stats
          ON answer_stats.workbook_question_id = workbook_questions.id
        WHERE workbook_questions.workbook_id = $1
          AND workbook_questions.deleted_at IS NULL
        ORDER BY workbook_questions.sequence ASC`,
-      [workbookId],
+      statsValues,
     );
 
     return {
