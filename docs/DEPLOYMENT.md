@@ -112,6 +112,15 @@ If `pdftotext` is missing, the API returns a clear server error instead of silen
 falling back to broken text extraction. Do not store uploaded original PDFs permanently
 unless a separate storage policy is designed and approved.
 
+Optional AI-assisted PDF correction can be enabled with Backend-only Railway
+Variables:
+
+- `OPENAI_API_KEY`: OpenAI API key used only by the Backend.
+- `OPENAI_PDF_IMPORT_MODEL`: optional model name for PDF import correction.
+
+If `OPENAI_API_KEY` is not set, normal PDF import still works. Only requests with
+`useAiAssist=true` fail with a clear AI configuration error.
+
 ## 7. Kakao student login settings
 
 Add these values directly in Railway Variables. Do not commit real Kakao keys.

@@ -61,6 +61,11 @@ export type PdfQuestionImportPreviewItem = {
   reasons: string[];
 };
 
+export type PdfQuestionImportPreviewOptions = {
+  useAiAssist?: boolean;
+  aiAssistMode?: 'all' | 'review_only';
+};
+
 export type PdfQuestionImportConfirmItem = {
   questionNumber?: number;
   subject: string;
@@ -112,6 +117,7 @@ type PdfQuestionImportPreviewResponse = {
       ready: number;
       needsReview: number;
       invalid: number;
+      parseWarnings?: string[];
     };
   };
 };
@@ -204,11 +210,16 @@ export const questionApi = {
     });
   },
 
-  previewPdfImport(questionPdf: File, answerPdf: File) {
+  previewPdfImport(questionPdf: File, answerPdf: File, options: PdfQuestionImportPreviewOptions = {}) {
     const formData = new FormData();
 
     formData.append('questionPdf', questionPdf);
     formData.append('answerPdf', answerPdf);
+
+    if (options.useAiAssist) {
+      formData.append('useAiAssist', 'true');
+      formData.append('aiAssistMode', options.aiAssistMode ?? 'all');
+    }
 
     return apiRequest<PdfQuestionImportPreviewResponse>('/admin/questions/pdf-import/preview', {
       method: 'POST',

@@ -110,6 +110,9 @@ export function QuestionPage() {
   const [importErrorMessage, setImportErrorMessage] = useState('');
   const [importSuccessMessage, setImportSuccessMessage] = useState('');
   const [permissionConfirmed, setPermissionConfirmed] = useState(false);
+  const [useAiAssist, setUseAiAssist] = useState(false);
+  const [aiAssistMode, setAiAssistMode] = useState<'all' | 'review_only'>('all');
+  const [importParseWarnings, setImportParseWarnings] = useState<string[]>([]);
 
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -314,6 +317,9 @@ export function QuestionPage() {
     setImportErrorMessage('');
     setImportSuccessMessage('');
     setPermissionConfirmed(false);
+    setUseAiAssist(false);
+    setAiAssistMode('all');
+    setImportParseWarnings([]);
   };
 
   const handlePdfPreview = async () => {
@@ -327,7 +333,10 @@ export function QuestionPage() {
     setImportSuccessMessage('');
 
     try {
-      const response = await questionApi.previewPdfImport(questionPdfFile, answerPdfFile);
+      const response = await questionApi.previewPdfImport(questionPdfFile, answerPdfFile, {
+        useAiAssist,
+        aiAssistMode,
+      });
       setImportQuestions(
         response.data.items.map((item) => ({
           ...item,
@@ -339,8 +348,10 @@ export function QuestionPage() {
         })),
       );
       setPermissionConfirmed(false);
+      setImportParseWarnings(response.data.summary.parseWarnings ?? []);
     } catch (error) {
       setImportQuestions([]);
+      setImportParseWarnings([]);
       setImportErrorMessage(error instanceof Error ? error.message : 'PDF를 파싱하지 못했습니다.');
     } finally {
       setIsParsingPdf(false);
@@ -394,6 +405,7 @@ export function QuestionPage() {
       setImportSuccessMessage(`${response.data.createdCount}개 문제가 draft 상태로 생성되었습니다.`);
       setImportQuestions([]);
       setPermissionConfirmed(false);
+      setImportParseWarnings([]);
       setPage(1);
       await Promise.all([loadQuestions(1), loadFilterOptions()]);
     } catch (error) {
@@ -530,8 +542,44 @@ export function QuestionPage() {
               </span>
             </div>
 
+            <div className="form-grid">
+              <label className="search-field">
+                <span>AI 보정</span>
+                <input
+                  checked={useAiAssist}
+                  disabled={isParsingPdf || isCreatingDrafts}
+                  type="checkbox"
+                  onChange={(event) => setUseAiAssist(event.target.checked)}
+                />
+                <span>AI 보정 사용</span>
+              </label>
+              <label>
+                <span>AI 보정 범위</span>
+                <select
+                  disabled={!useAiAssist || isParsingPdf || isCreatingDrafts}
+                  value={aiAssistMode}
+                  onChange={(event) => setAiAssistMode(event.target.value as 'all' | 'review_only')}
+                >
+                  <option value="all">전체 보정</option>
+                  <option value="review_only">검토 필요 문항만 보정</option>
+                </select>
+              </label>
+            </div>
+            <p className="table-subtitle">
+              AI 보정 결과도 반드시 미리보기에서 확인한 뒤 생성하세요. API Key는 Backend에서만 사용됩니다.
+            </p>
+
             {importErrorMessage ? <p className="table-subtitle">{importErrorMessage}</p> : null}
             {importSuccessMessage ? <p className="table-subtitle">{importSuccessMessage}</p> : null}
+            {importParseWarnings.length > 0 ? (
+              <div className="empty-state">
+                <strong>파싱 경고</strong>
+                {importParseWarnings.slice(0, 5).map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+                {importParseWarnings.length > 5 ? <p>외 {importParseWarnings.length - 5}건</p> : null}
+              </div>
+            ) : null}
 
             {importQuestions.length > 0 ? (
               <>

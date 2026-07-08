@@ -1509,6 +1509,8 @@ Form fields:
 | --- | --- | --- |
 | `questionPdf` | file | 문제지 PDF. `application/pdf`, 최대 10MB |
 | `answerPdf` | file | 정답지 PDF. `application/pdf`, 최대 10MB |
+| `useAiAssist` | boolean | 선택. `true`이면 Backend에서 AI 보정을 수행한다. 기본값은 `false` |
+| `aiAssistMode` | string | 선택. `all` 또는 `review_only`. `useAiAssist=true`일 때만 사용하며 기본값은 `all` |
 
 Response:
 
@@ -1555,9 +1557,18 @@ Response:
 - 다단 레이아웃은 좌표를 기준으로 행을 구성한 뒤 1~4열 후보 중 문항 marker가 가장 안정적인 열 구성을 선택한다.
 - 정답지는 `교시`, `과목`, `문제번호`, `최종답안`이 함께 있는 행 또는 전체 텍스트의 번호-정답 패턴에서 문제번호별 과목과 답안 `1~5`를 수집한다.
 - 정답지에서 과목 셀이 병합되어 다음 행에 문제번호와 답안만 이어지는 경우, 직전에 추출한 과목을 같은 문제번호 매핑에 사용한다.
-- 문제번호 기준 과목 매핑에 실패하면 `PDF 가져오기`를 fallback으로 표시하고 미리보기 사유에 검토 메시지를 포함한다.
+- 문제번호 기준 과목 매핑에 실패하거나 정답표에 과목 정보가 없으면 `PDF 가져오기`를 fallback으로 표시한다.
 - 전체 문서가 하나의 문항으로 합쳐진 것으로 판단되면 문항 경계 실패로 처리한다.
-- `summary.parseWarnings`에는 문제번호 누락/중복 가능성, 정답표에는 있으나 문제지에서 찾지 못한 번호 등 전체 파싱 경고를 포함할 수 있다.
+- `summary.parseWarnings`에는 문제번호 누락/중복 가능성, 정답표에는 있으나 문제지에서 찾지 못한 번호, AI 보정 경고 등 전체 파싱 경고를 포함할 수 있다.
+
+AI 보정 옵션:
+
+- AI 보정은 선택 기능이며, 사용하지 않으면 기존 Poppler 기반 파싱만 수행한다.
+- AI 보정을 사용해도 결과는 즉시 DB에 저장되지 않고 미리보기로만 반환된다. 강사가 미리보기에서 검토·수정·선택한 뒤 확정 생성 API를 호출해야 `draft` 문제가 생성된다.
+- `aiAssistMode=all`: 전체 문항을 AI 보정 대상으로 전달한다.
+- `aiAssistMode=review_only`: 기존 파서가 `ready`로 판단한 문항은 유지하고, `needs_review` 또는 `invalid` 문항만 AI 보정 대상으로 전달한다.
+- AI는 문제지/정답지 추출 텍스트와 기존 파싱 결과 안에서만 보정해야 하며, 원문에 없는 문제·보기·정답을 새로 만들면 안 된다.
+- OpenAI API Key와 모델 설정은 Backend 환경변수로만 관리하며 Admin Web이나 Student App에 노출하지 않는다.
 
 주요 오류 코드:
 
@@ -1565,6 +1576,10 @@ Response:
 - `PDF_TEXT_EXTRACTION_FAILED`: PDF 텍스트 추출에 실패했다.
 - `PDF_QUESTION_PARSE_FAILED`: 문제지에서 문항을 찾지 못했다.
 - `PDF_QUESTION_BOUNDARY_FAILED`: 문항 경계를 안정적으로 분리하지 못했다.
+- `PDF_IMPORT_AI_API_KEY_REQUIRED`: AI 보정을 요청했지만 Backend에 `OPENAI_API_KEY`가 설정되어 있지 않다.
+- `PDF_IMPORT_AI_REQUEST_FAILED`: AI 보정 요청이 실패했다.
+- `PDF_IMPORT_AI_RESPONSE_EMPTY`: AI 보정 응답이 비어 있다.
+- `PDF_IMPORT_AI_RESPONSE_INVALID`: AI 보정 결과에서 유효한 문항을 찾지 못했다.
 
 ### PDF 문제 일괄 등록 확정 생성
 

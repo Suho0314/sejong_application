@@ -11,12 +11,14 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
 import { ConfirmPdfQuestionDraftDto, ConfirmPdfQuestionImportDto } from './dto/confirm-pdf-question-import.dto';
+import { PreviewPdfQuestionImportDto } from './dto/preview-pdf-question-import.dto';
 import {
   parsePdfAnswerPages,
   parsePdfQuestionPages,
   ParsedPdfAnswer,
   ParsedPdfQuestion,
 } from './question-pdf-parser';
+import { QuestionPdfAiAssistService } from './question-pdf-ai-assist.service';
 import { QuestionsService } from './questions.service';
 
 const execFileAsync = promisify(execFile);
@@ -75,9 +77,16 @@ const CIRCLED_CHOICE_MAP = new Map([
 
 @Injectable()
 export class QuestionPdfImportService {
-  constructor(private readonly questionsService: QuestionsService) {}
+  constructor(
+    private readonly questionsService: QuestionsService,
+    private readonly aiAssistService: QuestionPdfAiAssistService,
+  ) {}
 
-  async preview(questionPdf?: UploadedPdfFile, answerPdf?: UploadedPdfFile) {
+  async preview(
+    questionPdf?: UploadedPdfFile,
+    answerPdf?: UploadedPdfFile,
+    options: PreviewPdfQuestionImportDto = {},
+  ) {
     this.assertPdfFile(questionPdf, '문제지 PDF');
     this.assertPdfFile(answerPdf, '정답지 PDF');
 
@@ -108,8 +117,23 @@ export class QuestionPdfImportService {
       });
     }
 
-    const items = parsedQuestions.map((question) => this.toPreviewItem(question, answersByNumber));
-    const extractedQuestionNumbers = new Set(parsedQuestions.map((question) => question.questionNumber));
+    let items = parsedQuestions.map((question) => this.toPreviewItem(question, answersByNumber));
+
+    const useAiAssist = this.isTruthyOption(options.useAiAssist);
+    const aiAssistMode = options.aiAssistMode === 'review_only' ? 'review_only' : 'all';
+
+    if (useAiAssist) {
+      const aiAssistResult = await this.aiAssistService.assist({
+        questionPages,
+        answerPages,
+        ruleItems: items,
+        mode: aiAssistMode,
+      });
+      items = aiAssistResult.items;
+      questionParseResult.warnings.push(...aiAssistResult.warnings);
+    }
+
+    const extractedQuestionNumbers = new Set(items.map((question) => question.questionNumber));
     const unmatchedAnswerWarnings = [...answersByNumber.keys()]
       .filter((questionNumber) => !extractedQuestionNumbers.has(questionNumber))
       .sort((left, right) => left - right)
@@ -182,6 +206,10 @@ export class QuestionPdfImportService {
         questions: createdQuestions,
       },
     };
+  }
+
+  private isTruthyOption(value: unknown): boolean {
+    return value === true || value === 'true' || value === '1' || value === 'on';
   }
 
   private assertPdfFile(file: UploadedPdfFile | undefined, label: string): asserts file is UploadedPdfFile {
