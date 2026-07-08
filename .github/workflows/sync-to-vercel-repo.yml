@@ -16,12 +16,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VERCEL_REPO_DEPLOY_KEY }}" > ~/.ssh/vercel_repo_key
+          chmod 600 ~/.ssh/vercel_repo_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
       - name: Push main to Vercel repository
-        env:
-          MIRROR_REPO_TOKEN: ${{ secrets.MIRROR_REPO_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git remote add vercel-repo https://x-access-token:${MIRROR_REPO_TOKEN}@github.com/Suho0314/sejong_application.git
+          git remote add vercel-repo git@github.com:Suho0314/sejong_application.git
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/vercel_repo_key -o IdentitiesOnly=yes" \
           git push --force-with-lease vercel-repo HEAD:main

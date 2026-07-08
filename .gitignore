@@ -9,3 +9,7 @@ vite.config.d.ts
 .env
 .env.*
 !.env.example
+
+# GitHub Actions Deploy Key
+sync_to_vercel_repo_key
+sync_to_vercel_repo_key.pub
