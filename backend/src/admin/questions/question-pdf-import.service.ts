@@ -96,8 +96,10 @@ export class QuestionPdfImportService {
     const answerParseResult = parsePdfAnswerPages(answerPages);
     const parsedQuestions = questionParseResult.questions;
     const answersByNumber = answerParseResult.answers;
+    const useAiAssist = this.isTruthyOption(options.useAiAssist);
+    const aiAssistMode = options.aiAssistMode === 'review_only' ? 'review_only' : 'all';
 
-    if (parsedQuestions.length === 0) {
+    if (parsedQuestions.length === 0 && !useAiAssist) {
       throw new UnprocessableEntityException({
         error: {
           code: 'PDF_QUESTION_PARSE_FAILED',
@@ -108,25 +110,31 @@ export class QuestionPdfImportService {
     }
 
     if (parsedQuestions.length <= 1 && this.countQuestionStartCandidates(questionPages) > 1) {
-      throw new UnprocessableEntityException({
-        error: {
-          code: 'PDF_QUESTION_BOUNDARY_FAILED',
-          message: '문항 경계를 안정적으로 분리하지 못했습니다. PDF 텍스트 레이아웃을 확인해주세요.',
-          details: [],
-        },
-      });
+      const boundaryWarning = '문항 경계를 안정적으로 분리하지 못했습니다. AI 보정 결과를 반드시 검토해주세요.';
+
+      if (!useAiAssist) {
+        throw new UnprocessableEntityException({
+          error: {
+            code: 'PDF_QUESTION_BOUNDARY_FAILED',
+            message: '문항 경계를 안정적으로 분리하지 못했습니다. PDF 텍스트 레이아웃을 확인해주세요.',
+            details: [],
+          },
+        });
+      }
+
+      questionParseResult.warnings.push(boundaryWarning);
     }
 
     let items = parsedQuestions.map((question) => this.toPreviewItem(question, answersByNumber));
-
-    const useAiAssist = this.isTruthyOption(options.useAiAssist);
-    const aiAssistMode = options.aiAssistMode === 'review_only' ? 'review_only' : 'all';
 
     if (useAiAssist) {
       const aiAssistResult = await this.aiAssistService.assist({
         questionPages,
         answerPages,
         ruleItems: items,
+        answerItems: this.toAnswerItems(answersByNumber),
+        parserQuestionCount: parsedQuestions.length,
+        parserWarnings: [...questionParseResult.warnings, ...answerParseResult.warnings],
         mode: aiAssistMode,
       });
       items = aiAssistResult.items;
@@ -206,6 +214,16 @@ export class QuestionPdfImportService {
         questions: createdQuestions,
       },
     };
+  }
+
+  private toAnswerItems(answersByNumber: Map<number, ParsedAnswer>) {
+    return [...answersByNumber.entries()]
+      .map(([questionNumber, answer]) => ({
+        questionNumber,
+        answerNumber: answer.answerIndex + 1,
+        subject: answer.subject,
+      }))
+      .sort((left, right) => left.questionNumber - right.questionNumber);
   }
 
   private isTruthyOption(value: unknown): boolean {

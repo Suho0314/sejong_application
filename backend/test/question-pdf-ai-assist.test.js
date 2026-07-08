@@ -62,6 +62,24 @@ const answerMismatch = service.toPreviewItems([
 assert.strictEqual(answerMismatch[0].status, 'needs_review');
 assert.ok(answerMismatch[0].reasons.some((reason) => reason.includes('정답표')));
 
+const answerMapMismatch = service.toPreviewItems([
+  {
+    number: 2,
+    content: 'Raw fallback content',
+    choices: ['Choice 1', 'Choice 2', 'Choice 3', 'Choice 4', 'Choice 5'],
+    correctAnswerNumber: 3,
+    subject: null,
+    category: null,
+    warnings: [],
+  },
+], [], [], [{ questionNumber: 2, answerNumber: 1, subject: 'Answer Subject' }]);
+
+assert.strictEqual(answerMapMismatch[0].status, 'needs_review');
+assert.strictEqual(answerMapMismatch[0].answerNumber, 1);
+assert.strictEqual(answerMapMismatch[0].correctAnswerIndex, 0);
+assert.strictEqual(answerMapMismatch[0].subject, 'Answer Subject');
+assert.ok(answerMapMismatch[0].reasons.some((reason) => reason.includes('정답표')));
+
 async function assertNoApiKeyFailure() {
   const noKeyService = new QuestionPdfAiAssistService({ get: () => undefined });
 

@@ -1564,6 +1564,8 @@ Response:
 AI 보정 옵션:
 
 - AI 보정은 선택 기능이며, 사용하지 않으면 기존 Poppler 기반 파싱만 수행한다.
+- AI 보정을 사용하지 않을 때 기본 파서가 0문항을 찾으면 기존처럼 `PDF_QUESTION_PARSE_FAILED`를 반환한다.
+- AI 보정을 사용할 때 기본 파서가 0문항을 찾더라도 문제지 raw text가 추출되어 있으면 즉시 실패하지 않고 raw text, 정답지 text, 정답 map, parser warning을 AI 보정 단계로 전달한다.
 - AI 보정을 사용해도 결과는 즉시 DB에 저장되지 않고 미리보기로만 반환된다. 강사가 미리보기에서 검토·수정·선택한 뒤 확정 생성 API를 호출해야 `draft` 문제가 생성된다.
 - `aiAssistMode=all`: 전체 문항을 AI 보정 대상으로 전달한다.
 - `aiAssistMode=review_only`: 기존 파서가 `ready`로 판단한 문항은 유지하고, `needs_review` 또는 `invalid` 문항만 AI 보정 대상으로 전달한다.
@@ -1576,7 +1578,7 @@ AI 보정 옵션:
 - `PDF_TEXT_EXTRACTION_FAILED`: PDF 텍스트 추출에 실패했다.
 - `PDF_QUESTION_PARSE_FAILED`: 문제지에서 문항을 찾지 못했다.
 - `PDF_QUESTION_BOUNDARY_FAILED`: 문항 경계를 안정적으로 분리하지 못했다.
-- `PDF_IMPORT_AI_API_KEY_REQUIRED`: AI 보정을 요청했지만 Backend에 `OPENAI_API_KEY`가 설정되어 있지 않다.
+- `PDF_IMPORT_AI_API_KEY_REQUIRED`: AI 보정을 요청했지만 Backend에 `OPENAI_API_KEY`가 설정되어 있지 않다. AI 보정을 사용하지 않는 일반 PDF import에는 영향을 주지 않는다.
 - `PDF_IMPORT_AI_REQUEST_FAILED`: AI 보정 요청이 실패했다.
 - `PDF_IMPORT_AI_RESPONSE_EMPTY`: AI 보정 응답이 비어 있다.
 - `PDF_IMPORT_AI_RESPONSE_INVALID`: AI 보정 결과에서 유효한 문항을 찾지 못했다.
