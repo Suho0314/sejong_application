@@ -4,12 +4,13 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { DatabaseModule } from '../../database/database.module';
 import { QuestionsController } from './questions.controller';
+import { QuestionPdfAiAssistService } from './question-pdf-ai-assist.service';
 import { QuestionPdfImportService } from './question-pdf-import.service';
 import { QuestionsService } from './questions.service';
 
 @Module({
   imports: [DatabaseModule, JwtModule.register({})],
   controllers: [QuestionsController],
-  providers: [QuestionsService, QuestionPdfImportService, JwtAuthGuard, RolesGuard],
+  providers: [QuestionsService, QuestionPdfImportService, QuestionPdfAiAssistService, JwtAuthGuard, RolesGuard],
 })
 export class QuestionsModule {}

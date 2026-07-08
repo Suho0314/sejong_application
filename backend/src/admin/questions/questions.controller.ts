@@ -23,6 +23,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { BulkUpdateQuestionCategoryDto } from './dto/bulk-update-question-category.dto';
 import { BulkUpdateQuestionStatusDto } from './dto/bulk-update-question-status.dto';
 import { ConfirmPdfQuestionImportDto } from './dto/confirm-pdf-question-import.dto';
+import { PreviewPdfQuestionImportDto } from './dto/preview-pdf-question-import.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { ListQuestionFilterOptionsDto } from './dto/list-question-filter-options.dto';
 import { ListQuestionsDto } from './dto/list-questions.dto';
@@ -81,8 +82,11 @@ export class QuestionsController {
     { name: 'questionPdf', maxCount: 1 },
     { name: 'answerPdf', maxCount: 1 },
   ]))
-  previewPdfImport(@UploadedFiles() files: PdfImportFiles) {
-    return this.questionPdfImportService.preview(files.questionPdf?.[0], files.answerPdf?.[0]);
+  previewPdfImport(
+    @UploadedFiles() files: PdfImportFiles,
+    @Body() body: PreviewPdfQuestionImportDto,
+  ) {
+    return this.questionPdfImportService.preview(files.questionPdf?.[0], files.answerPdf?.[0], body);
   }
 
   @Post('pdf-import/confirm')

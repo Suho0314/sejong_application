@@ -174,7 +174,9 @@ export function parsePdfAnswerPages(pages: PdfParserPageText[]): ParsedPdfAnswer
     const questionNumber = Number(structuredMatch[2]);
     const answerNumber = Number(structuredMatch[3]);
 
-    if (!subject || !isValidQuestionAnswerPair(questionNumber, answerNumber)) continue;
+    if (!subject || !isLikelyAnswerSubject(subject) || !isValidQuestionAnswerPair(questionNumber, answerNumber)) {
+      continue;
+    }
 
     currentSubject = subject;
     matchedStructuredRows += 1;
@@ -417,8 +419,17 @@ function cleanAnswerSubject(value: string): string | null {
   if (!subject || subject.length > 60) return null;
   if (!/[가-힣A-Za-z]/.test(subject)) return null;
   if (/^(?:교시|과목|문제번호|문항번호|최종답안|정답|답안|번호)$/i.test(subject)) return null;
+  if (/(정답표|정답 내용|공식 정답지|풀이 정답표|문항)/.test(subject)) return null;
 
   return subject;
+}
+
+function isLikelyAnswerSubject(subject: string): boolean {
+  const normalized = subject.replace(/\s+/g, '');
+
+  return /^(?:실기|[가-힣A-Za-z0-9·ㆍ/()\-]*(?:간호학개요|보건간호학개요|공중보건학개론|간호학|보건학|요양보호|실기)[가-힣A-Za-z0-9·ㆍ/()\-]*)$/.test(
+    normalized,
+  );
 }
 
 function isValidQuestionAnswerPair(questionNumber: number, answerNumber: number): boolean {
