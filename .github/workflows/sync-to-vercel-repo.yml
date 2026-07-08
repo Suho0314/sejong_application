@@ -30,4 +30,4 @@ jobs:
 
           git remote add vercel-repo git@github.com:Suho0314/sejong_application.git
           GIT_SSH_COMMAND="ssh -i ~/.ssh/vercel_repo_key -o IdentitiesOnly=yes" \
-          git push --force-with-lease vercel-repo HEAD:main
+          git push --force vercel-repo HEAD:main
