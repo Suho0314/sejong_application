@@ -11,6 +11,12 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
 import { ConfirmPdfQuestionDraftDto, ConfirmPdfQuestionImportDto } from './dto/confirm-pdf-question-import.dto';
+import {
+  parsePdfAnswerPages,
+  parsePdfQuestionPages,
+  ParsedPdfAnswer,
+  ParsedPdfQuestion,
+} from './question-pdf-parser';
 import { QuestionsService } from './questions.service';
 
 const execFileAsync = promisify(execFile);
@@ -44,19 +50,9 @@ type PopplerPage = {
 
 export type PdfImportPreviewStatus = 'ready' | 'needs_review' | 'invalid';
 
-type ParsedQuestion = {
-  questionNumber: number;
-  subject: string;
-  category: string | null;
-  content: string;
-  choices: string[];
-  pageNumber: number;
-};
+type ParsedQuestion = ParsedPdfQuestion;
 
-type ParsedAnswer = {
-  answerIndex: number;
-  subject: string | null;
-};
+type ParsedAnswer = ParsedPdfAnswer;
 
 export type PdfImportPreviewItem = ParsedQuestion & {
   correctAnswerIndex: number | null;
@@ -87,8 +83,10 @@ export class QuestionPdfImportService {
 
     const questionPages = await this.extractPdfPages(questionPdf.buffer);
     const answerPages = await this.extractPdfPages(answerPdf.buffer);
-    const parsedQuestions = this.parseQuestions(questionPages);
-    const answersByNumber = this.parseAnswers(answerPages);
+    const questionParseResult = parsePdfQuestionPages(questionPages, DEFAULT_SUBJECT);
+    const answerParseResult = parsePdfAnswerPages(answerPages);
+    const parsedQuestions = questionParseResult.questions;
+    const answersByNumber = answerParseResult.answers;
 
     if (parsedQuestions.length === 0) {
       throw new UnprocessableEntityException({
@@ -111,6 +109,16 @@ export class QuestionPdfImportService {
     }
 
     const items = parsedQuestions.map((question) => this.toPreviewItem(question, answersByNumber));
+    const extractedQuestionNumbers = new Set(parsedQuestions.map((question) => question.questionNumber));
+    const unmatchedAnswerWarnings = [...answersByNumber.keys()]
+      .filter((questionNumber) => !extractedQuestionNumbers.has(questionNumber))
+      .sort((left, right) => left - right)
+      .map((questionNumber) => `${questionNumber}번 정답은 있으나 문제지에서 해당 문항을 찾지 못했습니다.`);
+    const parseWarnings = [
+      ...questionParseResult.warnings,
+      ...answerParseResult.warnings,
+      ...unmatchedAnswerWarnings,
+    ];
 
     return {
       data: {
@@ -120,6 +128,7 @@ export class QuestionPdfImportService {
           ready: items.filter((item) => item.status === 'ready').length,
           needsReview: items.filter((item) => item.status === 'needs_review').length,
           invalid: items.filter((item) => item.status === 'invalid').length,
+          parseWarnings,
         },
       },
     };
@@ -362,21 +371,26 @@ export class QuestionPdfImportService {
   private rebuildLinesFromPopplerWords(page: PopplerPage): string[] {
     const rows = this.groupWordsIntoRows(page.words);
     const singleColumnLines = this.rowsToSingleColumnLines(rows, page);
-    const twoColumnLines = this.rowsToTwoColumnLines(rows, page);
-    const twoColumnQuestionStarts = this.countQuestionStartCandidates([{ pageNumber: page.pageNumber, lines: twoColumnLines }]);
-    const singleColumnQuestionStarts = this.countQuestionStartCandidates([
-      { pageNumber: page.pageNumber, lines: singleColumnLines },
-    ]);
+    let best = {
+      columnCount: 1,
+      lines: singleColumnLines,
+      questionStarts: this.countQuestionStartCandidates([{ pageNumber: page.pageNumber, lines: singleColumnLines }]),
+    };
 
-    if (
-      twoColumnLines.length >= 6 &&
-      twoColumnQuestionStarts >= Math.max(2, singleColumnQuestionStarts) &&
-      this.hasBalancedColumns(rows, page)
-    ) {
-      return twoColumnLines;
+    for (const columnCount of [2, 3, 4]) {
+      const lines = this.rowsToColumnLines(rows, page, columnCount);
+      const questionStarts = this.countQuestionStartCandidates([{ pageNumber: page.pageNumber, lines }]);
+
+      if (
+        lines.length >= 6 &&
+        questionStarts > best.questionStarts &&
+        this.hasUsableColumns(rows, page, columnCount)
+      ) {
+        best = { columnCount, lines, questionStarts };
+      }
     }
 
-    return singleColumnLines;
+    return best.lines;
   }
 
   private groupWordsIntoRows(words: PopplerWord[]): Array<{ y: number; yMin: number; yMax: number; words: PopplerWord[] }> {
@@ -414,30 +428,32 @@ export class QuestionPdfImportService {
       .filter(Boolean);
   }
 
-  private rowsToTwoColumnLines(
+  private rowsToColumnLines(
     rows: Array<{ y: number; yMin: number; yMax: number; words: PopplerWord[] }>,
     page: PopplerPage,
+    columnCount: number,
   ): string[] {
-    const midpoint = page.width > 0 ? page.width / 2 : this.estimateMidpoint(rows);
-    const leftLines: Array<{ y: number; text: string }> = [];
-    const rightLines: Array<{ y: number; text: string }> = [];
+    const width = page.width > 0 ? page.width : this.estimatePageWidth(rows);
+    const columnLines = Array.from({ length: columnCount }, () => [] as Array<{ y: number; text: string }>);
 
     for (const row of rows) {
-      const leftWords = row.words.filter((word) => (word.xMin + word.xMax) / 2 < midpoint);
-      const rightWords = row.words.filter((word) => (word.xMin + word.xMax) / 2 >= midpoint);
-      const leftText = this.wordsToLine(leftWords);
-      const rightText = this.wordsToLine(rightWords);
+      for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+        const minX = (width / columnCount) * columnIndex;
+        const maxX = (width / columnCount) * (columnIndex + 1);
+        const columnWords = row.words.filter((word) => {
+          const centerX = (word.xMin + word.xMax) / 2;
+          return centerX >= minX && (columnIndex === columnCount - 1 ? centerX <= maxX : centerX < maxX);
+        });
+        const text = this.wordsToLine(columnWords);
 
-      if (leftText && !this.isHeaderFooterLine(leftText, page, row.yMin, row.yMax)) {
-        leftLines.push({ y: row.y, text: leftText });
-      }
-
-      if (rightText && !this.isHeaderFooterLine(rightText, page, row.yMin, row.yMax)) {
-        rightLines.push({ y: row.y, text: rightText });
+        if (text && !this.isHeaderFooterLine(text, page, row.yMin, row.yMax)) {
+          columnLines[columnIndex].push({ y: row.y, text });
+        }
       }
     }
 
-    return [...leftLines.sort((left, right) => left.y - right.y), ...rightLines.sort((left, right) => left.y - right.y)]
+    return columnLines
+      .flatMap((lines) => lines.sort((left, right) => left.y - right.y))
       .flatMap((line) => this.expandLogicalLines(line.text))
       .map((line) => line.trim())
       .filter(Boolean);
@@ -452,28 +468,36 @@ export class QuestionPdfImportService {
       .trim();
   }
 
-  private estimateMidpoint(rows: Array<{ words: PopplerWord[] }>): number {
-    const centers = rows
-      .flatMap((row) => row.words)
-      .map((word) => (word.xMin + word.xMax) / 2)
-      .sort((left, right) => left - right);
-
-    if (centers.length === 0) return 0;
-
-    return centers[Math.floor(centers.length / 2)];
+  private estimatePageWidth(rows: Array<{ words: PopplerWord[] }>): number {
+    const xMaxValues = rows.flatMap((row) => row.words).map((word) => word.xMax);
+    return xMaxValues.length > 0 ? Math.max(...xMaxValues) : 0;
   }
 
-  private hasBalancedColumns(rows: Array<{ words: PopplerWord[] }>, page: PopplerPage): boolean {
-    const midpoint = page.width > 0 ? page.width / 2 : this.estimateMidpoint(rows);
-    let leftRows = 0;
-    let rightRows = 0;
+  private hasUsableColumns(
+    rows: Array<{ words: PopplerWord[] }>,
+    page: PopplerPage,
+    columnCount: number,
+  ): boolean {
+    const width = page.width > 0 ? page.width : this.estimatePageWidth(rows);
+    const rowCounts = Array.from({ length: columnCount }, () => 0);
 
     for (const row of rows) {
-      if (row.words.some((word) => (word.xMin + word.xMax) / 2 < midpoint)) leftRows += 1;
-      if (row.words.some((word) => (word.xMin + word.xMax) / 2 >= midpoint)) rightRows += 1;
+      for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+        const minX = (width / columnCount) * columnIndex;
+        const maxX = (width / columnCount) * (columnIndex + 1);
+
+        if (
+          row.words.some((word) => {
+            const centerX = (word.xMin + word.xMax) / 2;
+            return centerX >= minX && (columnIndex === columnCount - 1 ? centerX <= maxX : centerX < maxX);
+          })
+        ) {
+          rowCounts[columnIndex] += 1;
+        }
+      }
     }
 
-    return leftRows >= 4 && rightRows >= 4 && Math.min(leftRows, rightRows) / Math.max(leftRows, rightRows) >= 0.25;
+    return rowCounts.every((count) => count >= 3);
   }
 
   private isHeaderFooterLine(text: string, page: PopplerPage, yMin: number, yMax: number): boolean {
@@ -845,6 +869,10 @@ export class QuestionPdfImportService {
     const choices = question.choices.filter(Boolean);
     const content = this.cleanText(question.content);
     const combinedText = [content, ...choices].join(' ');
+
+    for (const warning of question.parseWarnings ?? []) {
+      reasons.push(warning);
+    }
 
     if (!content) {
       reasons.push('문제 본문을 추출하지 못했습니다.');
