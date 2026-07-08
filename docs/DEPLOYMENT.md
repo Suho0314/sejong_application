@@ -146,3 +146,7 @@ OAuth safety rules:
 - Use exact URI values only. Do not use wildcards, prefix matching, or arbitrary subdomain patterns.
 - The Student App creates an OAuth `state` value per login attempt and verifies it before calling the backend callback API.
 - Do not log Kakao authorization codes, access tokens, refresh tokens, client secrets, or raw state values.
+
+## Vercel 자동 배포 테스트
+
+이 문구는 GitHub Actions mirror 동기화와 Vercel 자동 배포 흐름을 확인하기 위한 테스트 변경입니다.
