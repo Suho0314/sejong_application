@@ -23,10 +23,19 @@ type AiResponseShape = {
   warnings?: string[];
 };
 
+type AnswerItem = {
+  questionNumber: number;
+  answerNumber: number;
+  subject: string | null;
+};
+
 type AssistInput = {
   questionPages: PdfPageText[];
   answerPages: PdfPageText[];
   ruleItems: PdfImportPreviewItem[];
+  answerItems?: AnswerItem[];
+  parserQuestionCount?: number;
+  parserWarnings?: string[];
   mode: PdfImportAiAssistMode;
 };
 
@@ -56,7 +65,12 @@ export class QuestionPdfAiAssistService {
     const aiResponse = await this.callOpenAi(apiKey, model, input);
     const warnings = aiResponse.warnings ?? [];
 
-    const aiItems = this.toPreviewItems(aiResponse.questions ?? [], input.ruleItems, warnings);
+    const aiItems = this.toPreviewItems(
+      aiResponse.questions ?? [],
+      input.ruleItems,
+      warnings,
+      input.answerItems ?? [],
+    );
 
     if (input.mode === 'review_only') {
       const aiItemNumbers = new Set(aiItems.map((item) => item.questionNumber));
@@ -147,8 +161,10 @@ export class QuestionPdfAiAssistService {
       '제공된 텍스트와 기존 파싱 결과 안에서만 문제를 재구성하라.',
       '원문에 없는 문제, 보기, 정답을 새로 만들지 마라.',
       '문제 번호를 보존하라.',
+      '문항 번호가 "1. 문제"가 아니라 "1 문제" 형식일 수 있다.',
+      '기본 파서가 0문항을 찾았더라도 문제지 raw text가 있으면 raw text에서 문제를 복원하라.',
       '각 문제는 반드시 보기 5개여야 한다.',
-      '정답표가 제공되면 정답표의 번호를 우선하라.',
+      '정답표가 제공되면 정답표의 번호별 정답을 우선하라.',
       '확신이 없으면 임의로 고치지 말고 warnings에 남겨라.',
       '반환은 JSON만 하라.',
     ].join('\n');
@@ -163,9 +179,13 @@ export class QuestionPdfAiAssistService {
     return {
       mode: input.mode,
       instruction:
-        '문제지/정답지 추출 텍스트와 기존 파싱 결과를 비교해 최종 문제 JSON을 만들어라. correctAnswerNumber는 1~5 기준이다.',
+        '문제지/정답지 추출 텍스트와 기존 파싱 결과를 비교해 최종 문제 JSON을 만들어라. correctAnswerNumber는 1~5 기준이다. 기본 파서가 0문항을 찾은 경우에도 raw text에서 1 문제, 2 문제처럼 점 없는 문항 번호를 찾아라.',
+      parserQuestionCount: input.parserQuestionCount ?? input.ruleItems.length,
+      expectedQuestionCount: input.answerItems?.length ?? null,
+      parserWarnings: input.parserWarnings ?? [],
       questionText: this.pagesToText(input.questionPages),
       answerText: this.pagesToText(input.answerPages),
+      answerItems: input.answerItems ?? [],
       ruleParserItems: targetItems.map((item) => ({
         number: item.questionNumber,
         content: item.content,
@@ -251,18 +271,22 @@ export class QuestionPdfAiAssistService {
     aiQuestions: AiQuestion[],
     ruleItems: PdfImportPreviewItem[],
     globalWarnings: string[],
+    answerItems: AnswerItem[] = [],
   ): PdfImportPreviewItem[] {
     const ruleByNumber = new Map(ruleItems.map((item) => [item.questionNumber, item]));
+    const answerByNumber = new Map(answerItems.map((item) => [item.questionNumber, item]));
     const seenNumbers = new Set<number>();
     const items: PdfImportPreviewItem[] = aiQuestions.map((question) => {
       const base = ruleByNumber.get(question.number);
-      const reasons = this.validateAiQuestion(question, seenNumbers, base);
-      const subject = base?.subject || question.subject || 'PDF 가져오기';
+      const answer = answerByNumber.get(question.number);
+      const reasons = this.validateAiQuestion(question, seenNumbers, base, answer);
+      const subject = base?.subject || answer?.subject || question.subject || 'PDF 가져오기';
       const category = base?.category ?? question.category ?? null;
       const choices = Array.isArray(question.choices)
         ? question.choices.map((choice) => choice.trim())
         : [];
-      const correctAnswerIndex = question.correctAnswerNumber - 1;
+      const answerNumber = answer?.answerNumber ?? question.correctAnswerNumber;
+      const correctAnswerIndex = answerNumber - 1;
 
       seenNumbers.add(question.number);
 
@@ -274,7 +298,7 @@ export class QuestionPdfAiAssistService {
         choices,
         pageNumber: base?.pageNumber ?? 1,
         correctAnswerIndex,
-        answerNumber: question.correctAnswerNumber,
+        answerNumber,
         status: reasons.length === 0 ? 'ready' : 'needs_review',
         reasons: [...(question.warnings ?? []), ...reasons],
       };
@@ -297,6 +321,7 @@ export class QuestionPdfAiAssistService {
     question: AiQuestion,
     seenNumbers: Set<number>,
     base: PdfImportPreviewItem | undefined,
+    answer: AnswerItem | undefined,
   ): string[] {
     const reasons: string[] = [];
 
@@ -326,10 +351,12 @@ export class QuestionPdfAiAssistService {
       reasons.push('정답 번호가 1~5 범위를 벗어났습니다.');
     }
 
+    const expectedAnswerNumber = base?.answerNumber ?? answer?.answerNumber;
+
     if (
-      base?.answerNumber &&
+      expectedAnswerNumber &&
       Number.isInteger(question.correctAnswerNumber) &&
-      question.correctAnswerNumber !== base.answerNumber
+      question.correctAnswerNumber !== expectedAnswerNumber
     ) {
       reasons.push('정답표의 정답과 AI 보정 정답이 일치하지 않습니다.');
     }
