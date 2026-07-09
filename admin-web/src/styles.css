@@ -1190,3 +1190,67 @@ th {
   margin-bottom: 12px;
   object-fit: contain;
 }
+
+
+.question-form-modal-overlay {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.42);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 50;
+}
+
+.question-form-modal-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  max-width: 1080px;
+  overflow: hidden;
+  width: min(1080px, 92vw);
+}
+
+.question-form-modal-header {
+  flex: 0 0 auto;
+  gap: 16px;
+}
+
+.question-form-modal-close {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 22px;
+  height: 36px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 36px;
+}
+
+.question-form-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.question-form-modal-body .cohort-form {
+  padding-top: 16px;
+}
+
+.question-form-modal-error {
+  margin: 0;
+  padding: 12px 20px 0;
+}
+
+@media (max-width: 720px) {
+  .question-form-modal-overlay {
+    align-items: stretch;
+    padding: 12px;
+  }
+
+  .question-form-modal-panel {
+    max-height: calc(100vh - 24px);
+    width: 100%;
+  }
+}
