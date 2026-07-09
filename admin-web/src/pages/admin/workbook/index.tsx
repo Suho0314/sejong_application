@@ -77,18 +77,14 @@ const toQuestionRow = (question: QuestionApiItem): QuestionRow => ({
   updatedAt: question.updatedAt,
 });
 
-const toWorkbookTableRow = (
-  workbook: WorkbookApiItem,
-  selectedWorkbookId: string | null,
-  selectedTotalScore: number,
-): WorkbookTableRow => ({
+const toWorkbookTableRow = (workbook: WorkbookApiItem): WorkbookTableRow => ({
   id: workbook.id,
   title: workbook.title,
   description: workbook.description ?? '',
   status: workbook.status,
   passScore: workbook.passScore,
   questionCount: workbook.questionCount ?? 0,
-  totalScore: workbook.id === selectedWorkbookId ? selectedTotalScore : undefined,
+  totalScore: WORKBOOK_TOTAL_SCORE,
   updatedAt: workbook.updatedAt,
 });
 
@@ -165,10 +161,7 @@ export function WorkbookPage() {
   const workbookTotalPages = Math.max(1, Math.ceil(workbookTotalItems / WORKBOOK_PAGE_SIZE));
   const workbookCurrentPage = Math.min(workbookPage, workbookTotalPages);
 
-  const workbookTableRows = useMemo(
-    () => workbooks.map((workbook) => toWorkbookTableRow(workbook, selectedWorkbookId, selectedTotalScore)),
-    [selectedTotalScore, selectedWorkbookId, workbooks],
-  );
+  const workbookTableRows = useMemo(() => workbooks.map(toWorkbookTableRow), [workbooks]);
 
   const editingWorkbook = workbooks.find((workbook) => workbook.id === editingWorkbookId) ?? selectedWorkbook;
   const formInitialValues: WorkbookFormValues | undefined =
