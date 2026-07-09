@@ -542,6 +542,31 @@ th {
   padding: 18px 20px;
 }
 
+.bulk-actions-toolbar {
+  flex-wrap: wrap;
+}
+
+.bulk-selection-count {
+  min-width: 110px;
+  margin-bottom: 10px;
+  font-weight: 800;
+}
+
+.bulk-status-field {
+  flex: 0 1 180px;
+}
+
+.bulk-category-field {
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 320px;
+}
+
+.bulk-actions-toolbar .secondary-button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
 .search-field {
   display: grid;
   flex: 1;
@@ -872,6 +897,16 @@ th {
 
   .search-field {
     max-width: none;
+  }
+
+  .bulk-status-field,
+  .bulk-category-field {
+    width: 100%;
+    max-width: none;
+  }
+
+  .bulk-actions-toolbar .secondary-button {
+    width: 100%;
   }
 
   .form-grid {
