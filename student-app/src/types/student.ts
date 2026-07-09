@@ -21,6 +21,7 @@ export type Choice = {
 
 export type Question = {
   id: string;
+  sequence?: number;
   content: string;
   choices: Choice[];
   answerIndex: number;
@@ -59,6 +60,7 @@ export type SolveProgress = {
 
 export type GradedAnswer = {
   questionId: string;
+  sequence?: number;
   questionContent: string;
   choices: Choice[];
   selectedChoiceId?: string;

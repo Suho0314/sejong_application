@@ -4,7 +4,7 @@ export function gradeWorkbook(
   workbook: Workbook,
   studentAnswers: StudentAnswer[],
 ): SubmissionResult {
-  const gradedAnswers = workbook.questions.map((question) => {
+  const gradedAnswers = workbook.questions.map((question, questionIndex) => {
     const studentAnswer = studentAnswers.find((answer) => answer.questionId === question.id);
     const selectedChoice = question.choices.find(
       (choice) => choice.id === studentAnswer?.selectedChoiceId,
@@ -13,6 +13,7 @@ export function gradeWorkbook(
 
     return {
       questionId: question.id,
+      sequence: question.sequence ?? questionIndex + 1,
       questionContent: question.content,
       choices: question.choices,
       selectedChoiceId: selectedChoice?.id,

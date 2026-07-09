@@ -52,6 +52,7 @@ const toWorkbook = (assignment: StudentAssignmentApiItem): Workbook => ({
   correctRate: assignment.latestScore ?? undefined,
   questions: getAssignmentQuestions(assignment).map((question) => ({
     id: question.workbookQuestionId,
+    sequence: question.sequence,
     content: question.content ?? '문항 내용이 없습니다.',
     choices: Array.isArray(question.choices) ? question.choices : [],
     answerIndex: 0,
@@ -69,6 +70,7 @@ const toResult = (submission: ResultSource): SubmissionResult => {
     : (submission.answers ?? submission.gradedAnswers ?? []);
   const gradedAnswers: GradedAnswer[] = answers.map((answer) => ({
     questionId: answer.workbookQuestionId,
+    sequence: answer.sequence,
     questionContent: 'questionContent' in answer ? answer.questionContent : answer.content,
     choices: answer.choices,
     selectedChoiceId: answer.selectedChoiceId ?? undefined,

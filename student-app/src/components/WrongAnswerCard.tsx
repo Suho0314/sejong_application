@@ -6,16 +6,19 @@ const preserveLineBreaksStyle = Platform.OS === 'web' ? ({ whiteSpace: 'pre-wrap
 
 type WrongAnswerCardProps = {
   answer: GradedAnswer;
-  index: number;
 };
 
-export function WrongAnswerCard({ answer, index }: WrongAnswerCardProps) {
+export function WrongAnswerCard({ answer }: WrongAnswerCardProps) {
   const isCorrect = answer.isCorrect;
+  const questionNumberLabel =
+    typeof answer.sequence === 'number' && Number.isFinite(answer.sequence)
+      ? `${answer.sequence}번`
+      : '문항 번호 없음';
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.number}>{isCorrect ? '정답' : '오답'} {index + 1}</Text>
+        <Text style={styles.number}>{questionNumberLabel}</Text>
         <Text style={[styles.badge, isCorrect ? styles.correctResultBadge : styles.wrongResultBadge]}>
           {isCorrect ? '정답' : '틀림'}
         </Text>

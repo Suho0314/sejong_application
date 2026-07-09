@@ -84,8 +84,8 @@ export function ResultScreen({ navigation, route }: ScreenProps<'Result'>) {
           </View>
         ) : (
           <View style={styles.wrongList}>
-            {wrongAnswers.map((answer, index) => (
-              <WrongAnswerCard key={answer.questionId} answer={answer} index={index} />
+            {wrongAnswers.map((answer) => (
+              <WrongAnswerCard key={answer.questionId} answer={answer} />
             ))}
           </View>
         )}

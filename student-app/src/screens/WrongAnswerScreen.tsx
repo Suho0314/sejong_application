@@ -118,11 +118,10 @@ export function WrongAnswerScreen({ cohortId, submissions }: WrongAnswerScreenPr
 
                 {isExpanded ? (
                   <View style={styles.answerList}>
-                    {history.answers.map((answer, index) => (
+                    {history.answers.map((answer) => (
                       <WrongAnswerCard
                         key={answer.questionId}
                         answer={answer}
-                        index={index}
                       />
                     ))}
                   </View>
