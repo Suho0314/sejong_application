@@ -1,4 +1,4 @@
-import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PdfImportAiAssistMode } from './dto/preview-pdf-question-import.dto';
 import type { PdfImportPreviewItem } from './question-pdf-import.service';
@@ -23,6 +23,42 @@ type AiResponseShape = {
   warnings?: string[];
 };
 
+type OpenAiResponsesRequestBody = {
+  model: string;
+  input: Array<{ role: 'system' | 'user'; content: string }>;
+  text: {
+    format: {
+      type: 'json_schema';
+      name: string;
+      schema: Record<string, unknown>;
+      strict: true;
+    };
+  };
+  max_output_tokens: number;
+  reasoning?: {
+    effort: string;
+  };
+};
+
+type OpenAiResponseEnvelope = {
+  output_text?: string;
+  output?: Array<{
+    content?: Array<{
+      type?: string;
+      text?: string;
+    }>;
+  }>;
+  status?: string;
+  error?: {
+    code?: string;
+    message?: string;
+    type?: string;
+  } | null;
+  incomplete_details?: {
+    reason?: string;
+  } | null;
+};
+
 type AnswerItem = {
   questionNumber: number;
   answerNumber: number;
@@ -41,11 +77,16 @@ type AssistInput = {
 
 const DEFAULT_AI_MODEL = 'gpt-4.1-mini';
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
-const AI_REQUEST_TIMEOUT_MS = 45_000;
+const AI_REQUEST_TIMEOUT_MS = 90_000;
+const AI_MAX_OUTPUT_TOKENS = 20_000;
 const MAX_TEXT_CHARS = 120_000;
+const GPT5_MODEL_PATTERN = /^gpt-5(?:$|[.-])/i;
+const REASONING_EFFORT_VALUES = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
 
 @Injectable()
 export class QuestionPdfAiAssistService {
+  private readonly logger = new Logger(QuestionPdfAiAssistService.name);
+
   constructor(private readonly configService: ConfigService) {}
 
   async assist(input: AssistInput): Promise<{ items: PdfImportPreviewItem[]; warnings: string[] }> {
@@ -93,6 +134,7 @@ export class QuestionPdfAiAssistService {
   private async callOpenAi(apiKey: string, model: string, input: AssistInput): Promise<AiResponseShape> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
+    const requestBody = this.buildOpenAiRequestBody(model, input);
 
     try {
       const response = await fetch(OPENAI_RESPONSES_URL, {
@@ -101,58 +143,95 @@ export class QuestionPdfAiAssistService {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model,
-          input: [
-            {
-              role: 'system',
-              content: this.buildSystemPrompt(),
-            },
-            {
-              role: 'user',
-              content: JSON.stringify(this.buildUserPayload(input)),
-            },
-          ],
-          text: {
-            format: {
-              type: 'json_schema',
-              name: 'pdf_question_import_ai_assist',
-              schema: this.responseSchema(),
-              strict: true,
-            },
-          },
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
 
       const body = await response.text();
 
       if (!response.ok) {
+        const openAiError = this.extractOpenAiError(body);
+        this.logger.warn(
+          `PDF AI assist OpenAI request failed model=${this.safeModelName(model)} status=${response.status} code=${openAiError.code ?? 'unknown'} message=${openAiError.message ?? 'unknown'}`,
+        );
+
         throw new UnprocessableEntityException({
           error: {
             code: 'PDF_IMPORT_AI_REQUEST_FAILED',
             message: 'AI 보정 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
-            details: [{ status: response.status }],
+            details: [{ status: response.status, code: openAiError.code ?? null }],
           },
         });
       }
 
-      return this.parseOpenAiResponse(body);
+      return this.parseOpenAiResponse(body, model);
     } catch (error) {
       if (error instanceof UnprocessableEntityException) {
         throw error;
       }
 
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      this.logger.warn(
+        `PDF AI assist request failed model=${this.safeModelName(model)} reason=${isTimeout ? 'timeout' : 'network_or_parse'} message=${error instanceof Error ? error.message : 'unknown'}`,
+      );
+
       throw new UnprocessableEntityException({
         error: {
           code: 'PDF_IMPORT_AI_REQUEST_FAILED',
           message: 'AI 보정 요청에 실패했습니다. 네트워크, timeout, 응답 형식을 확인해주세요.',
-          details: [],
+          details: [{ reason: isTimeout ? 'timeout' : 'network_or_parse' }],
         },
       });
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private buildOpenAiRequestBody(model: string, input: AssistInput): OpenAiResponsesRequestBody {
+    const body: OpenAiResponsesRequestBody = {
+      model,
+      input: [
+        {
+          role: 'system',
+          content: this.buildSystemPrompt(),
+        },
+        {
+          role: 'user',
+          content: JSON.stringify(this.buildUserPayload(input)),
+        },
+      ],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'pdf_question_import_ai_assist',
+          schema: this.responseSchema(),
+          strict: true,
+        },
+      },
+      max_output_tokens: AI_MAX_OUTPUT_TOKENS,
+    };
+
+    if (this.isGpt5FamilyModel(model)) {
+      body.reasoning = {
+        effort: this.getReasoningEffort(),
+      };
+    }
+
+    return body;
+  }
+
+  private isGpt5FamilyModel(model: string): boolean {
+    return GPT5_MODEL_PATTERN.test(model.trim());
+  }
+
+  private getReasoningEffort(): string {
+    const configured = this.configService.get<string>('OPENAI_PDF_IMPORT_REASONING_EFFORT')?.trim().toLowerCase();
+
+    if (configured && REASONING_EFFORT_VALUES.has(configured)) {
+      return configured;
+    }
+
+    return 'low';
   }
 
   private buildSystemPrompt(): string {
@@ -206,7 +285,7 @@ export class QuestionPdfAiAssistService {
       .slice(0, MAX_TEXT_CHARS);
   }
 
-  private responseSchema() {
+  private responseSchema(): Record<string, unknown> {
     return {
       type: 'object',
       additionalProperties: false,
@@ -219,15 +298,13 @@ export class QuestionPdfAiAssistService {
             additionalProperties: false,
             required: ['number', 'content', 'choices', 'correctAnswerNumber', 'subject', 'category', 'warnings'],
             properties: {
-              number: { type: 'integer', minimum: 1, maximum: 300 },
+              number: { type: 'integer' },
               content: { type: 'string' },
               choices: {
                 type: 'array',
-                minItems: 5,
-                maxItems: 5,
                 items: { type: 'string' },
               },
-              correctAnswerNumber: { type: 'integer', minimum: 1, maximum: 5 },
+              correctAnswerNumber: { type: 'integer' },
               subject: { type: ['string', 'null'] },
               category: { type: ['string', 'null'] },
               warnings: {
@@ -245,16 +322,60 @@ export class QuestionPdfAiAssistService {
     };
   }
 
-  private parseOpenAiResponse(rawBody: string): AiResponseShape {
-    const parsed = JSON.parse(rawBody) as {
-      output_text?: string;
-      output?: Array<{ content?: Array<{ text?: string }> }>;
-    };
-    const text =
+  private parseOpenAiResponse(rawBody: string, model: string): AiResponseShape {
+    let parsed: OpenAiResponseEnvelope;
+
+    try {
+      parsed = JSON.parse(rawBody) as OpenAiResponseEnvelope;
+    } catch (error) {
+      this.logger.warn(
+        `PDF AI assist response JSON parse failed model=${this.safeModelName(model)} bodyLength=${rawBody.length} message=${error instanceof Error ? error.message : 'unknown'}`,
+      );
+      throw new UnprocessableEntityException({
+        error: {
+          code: 'PDF_IMPORT_AI_RESPONSE_PARSE_FAILED',
+          message: 'AI 보정 응답 형식을 해석하지 못했습니다.',
+          details: [],
+        },
+      });
+    }
+
+    if (parsed.error) {
+      this.logger.warn(
+        `PDF AI assist response returned error model=${this.safeModelName(model)} status=${parsed.status ?? 'unknown'} code=${parsed.error.code ?? 'unknown'} message=${parsed.error.message ?? 'unknown'}`,
+      );
+      throw new UnprocessableEntityException({
+        error: {
+          code: 'PDF_IMPORT_AI_RESPONSE_ERROR',
+          message: 'AI 보정 응답에 오류가 포함되어 있습니다.',
+          details: [{ code: parsed.error.code ?? null, status: parsed.status ?? null }],
+        },
+      });
+    }
+
+    if (parsed.status && parsed.status !== 'completed') {
+      this.logger.warn(
+        `PDF AI assist response incomplete model=${this.safeModelName(model)} status=${parsed.status} reason=${parsed.incomplete_details?.reason ?? 'unknown'}`,
+      );
+      throw new UnprocessableEntityException({
+        error: {
+          code: 'PDF_IMPORT_AI_RESPONSE_INCOMPLETE',
+          message: 'AI 보정 응답이 완료되지 않았습니다.',
+          details: [{ status: parsed.status, reason: parsed.incomplete_details?.reason ?? null }],
+        },
+      });
+    }
+
+    const outputText =
       parsed.output_text ??
-      parsed.output?.flatMap((item) => item.content ?? []).find((content) => content.text)?.text;
+      parsed.output
+        ?.flatMap((item) => item.content ?? [])
+        .filter((content) => content.type === undefined || content.type === 'output_text')
+        .find((content) => content.text)?.text;
+    const text = outputText?.trim();
 
     if (!text) {
+      this.logger.warn(`PDF AI assist response empty model=${this.safeModelName(model)} status=${parsed.status ?? 'unknown'}`);
       throw new UnprocessableEntityException({
         error: {
           code: 'PDF_IMPORT_AI_RESPONSE_EMPTY',
@@ -264,7 +385,38 @@ export class QuestionPdfAiAssistService {
       });
     }
 
-    return JSON.parse(text) as AiResponseShape;
+    try {
+      return JSON.parse(text) as AiResponseShape;
+    } catch (error) {
+      this.logger.warn(
+        `PDF AI assist output JSON parse failed model=${this.safeModelName(model)} outputLength=${text.length} message=${error instanceof Error ? error.message : 'unknown'}`,
+      );
+      throw new UnprocessableEntityException({
+        error: {
+          code: 'PDF_IMPORT_AI_OUTPUT_PARSE_FAILED',
+          message: 'AI 보정 결과 JSON을 해석하지 못했습니다.',
+          details: [],
+        },
+      });
+    }
+  }
+
+  private extractOpenAiError(rawBody: string): { code?: string; message?: string } {
+    try {
+      const parsed = JSON.parse(rawBody) as { error?: { code?: string; message?: string } };
+      return {
+        code: parsed.error?.code,
+        message: parsed.error?.message,
+      };
+    } catch {
+      return {
+        message: rawBody ? `non_json_error_body_length_${rawBody.length}` : 'empty_error_body',
+      };
+    }
+  }
+
+  private safeModelName(model: string): string {
+    return model.replace(/[^a-zA-Z0-9_.:-]/g, '');
   }
 
   private toPreviewItems(

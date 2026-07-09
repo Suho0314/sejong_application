@@ -128,17 +128,38 @@ export class QuestionPdfImportService {
     let items = parsedQuestions.map((question) => this.toPreviewItem(question, answersByNumber));
 
     if (useAiAssist) {
-      const aiAssistResult = await this.aiAssistService.assist({
-        questionPages,
-        answerPages,
-        ruleItems: items,
-        answerItems: this.toAnswerItems(answersByNumber),
-        parserQuestionCount: parsedQuestions.length,
-        parserWarnings: [...questionParseResult.warnings, ...answerParseResult.warnings],
-        mode: aiAssistMode,
-      });
-      items = aiAssistResult.items;
-      questionParseResult.warnings.push(...aiAssistResult.warnings);
+      try {
+        const aiAssistResult = await this.aiAssistService.assist({
+          questionPages,
+          answerPages,
+          ruleItems: items,
+          answerItems: this.toAnswerItems(answersByNumber),
+          parserQuestionCount: parsedQuestions.length,
+          parserWarnings: [...questionParseResult.warnings, ...answerParseResult.warnings],
+          mode: aiAssistMode,
+        });
+        items = aiAssistResult.items;
+        questionParseResult.warnings.push(...aiAssistResult.warnings);
+      } catch (error) {
+        if (items.length === 0) {
+          throw error;
+        }
+
+        const fallbackWarning =
+          'AI 보정 요청에 실패해 기본 PDF 파싱 결과를 검토 필요 상태로 표시합니다.';
+        questionParseResult.warnings.push(fallbackWarning);
+        items = items.map((item) =>
+          item.status === 'invalid'
+            ? item
+            : {
+                ...item,
+                status: 'needs_review',
+                reasons: item.reasons.includes(fallbackWarning)
+                  ? item.reasons
+                  : [...item.reasons, fallbackWarning],
+              },
+        );
+      }
     }
 
     const extractedQuestionNumbers = new Set(items.map((question) => question.questionNumber));
