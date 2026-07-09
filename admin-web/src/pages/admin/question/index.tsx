@@ -790,9 +790,9 @@ export function QuestionPage() {
         {bulkSuccessMessage ? <p className="table-subtitle">{bulkSuccessMessage}</p> : null}
         {isLoading ? <p className="table-subtitle">문제 목록을 불러오는 중입니다.</p> : null}
 
-        <div className="toolbar">
-          <span className="table-subtitle">선택된 문제 {selectedQuestionCount}개</span>
-          <label className="search-field">
+        <div className="toolbar bulk-actions-toolbar">
+          <span className="table-subtitle bulk-selection-count">선택된 문제 {selectedQuestionCount}개</span>
+          <label className="search-field bulk-status-field">
             <span>변경할 상태</span>
             <select
               disabled={selectedQuestionCount === 0 || isBulkStatusUpdating}
@@ -814,11 +814,7 @@ export function QuestionPage() {
           >
             {isBulkStatusUpdating ? '상태 변경 중...' : '선택 상태 일괄 변경'}
           </button>
-        </div>
-
-        <div className="toolbar">
-          <span className="table-subtitle">선택된 문제 {selectedQuestionCount}개</span>
-          <label className="search-field">
+          <label className="search-field bulk-category-field">
             <span>변경할 카테고리</span>
             <input
               disabled={selectedQuestionCount === 0 || isBulkCategoryUpdating}
