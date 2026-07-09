@@ -119,6 +119,7 @@ export function QuestionPage() {
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const selectedQuestionCount = selectedQuestionIds.size;
+  const isQuestionFormModalOpen = isCreating || editingQuestion !== null;
   const selectedImportQuestions = importQuestions.filter(
     (question) =>
       question.included &&
@@ -186,6 +187,38 @@ export function QuestionPage() {
     setEditingQuestion(null);
     setIsCreating(false);
   };
+
+  const openCreateForm = () => {
+    setEditingQuestion(null);
+    setIsCreating(true);
+    setErrorMessage('');
+  };
+
+  const openEditForm = (question: QuestionRow) => {
+    setIsCreating(false);
+    setEditingQuestion(question);
+    setErrorMessage('');
+  };
+
+  useEffect(() => {
+    if (!isQuestionFormModalOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isSubmitting) {
+        closeForm();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isQuestionFormModalOpen, isSubmitting]);
 
   const handleKeywordChange = (value: string) => {
     setKeyword(value);
@@ -524,7 +557,7 @@ export function QuestionPage() {
           >
             PDF 문제 일괄 등록
           </button>
-          <button className="primary-button" type="button" onClick={() => setIsCreating(true)}>
+          <button className="primary-button" type="button" onClick={openCreateForm}>
             문제 추가
           </button>
         </div>
@@ -831,7 +864,7 @@ export function QuestionPage() {
           </button>
         </div>
 
-        {errorMessage ? <p className="table-subtitle">{errorMessage}</p> : null}
+        {errorMessage && !isQuestionFormModalOpen ? <p className="table-subtitle">{errorMessage}</p> : null}
         {bulkSuccessMessage ? <p className="table-subtitle">{bulkSuccessMessage}</p> : null}
         {isLoading ? <p className="table-subtitle">문제 목록을 불러오는 중입니다.</p> : null}
 
@@ -897,7 +930,7 @@ export function QuestionPage() {
           questions={questions}
           selectedQuestionIds={selectedQuestionIds}
           onDelete={handleDelete}
-          onEdit={setEditingQuestion}
+          onEdit={openEditForm}
           onToggleSelect={toggleQuestionSelection}
           onToggleSelectAll={toggleVisibleQuestionSelection}
         />
@@ -909,23 +942,37 @@ export function QuestionPage() {
         />
       </section>
 
-      {(isCreating || editingQuestion) && (
-        <section className="dashboard-panel">
-          <div className="panel-header">
-            <div>
-              <h2>{isCreating ? '문제 추가' : '문제 수정'}</h2>
-              <p>객관식 문제는 보기 2~5개까지 관리할 수 있습니다. 저장 시 DB에 반영됩니다.</p>
+      {isQuestionFormModalOpen ? (
+        <div aria-labelledby="question-form-modal-title" aria-modal="true" className="question-form-modal-overlay" role="dialog">
+          <section className="dashboard-panel question-form-modal-panel">
+            <div className="panel-header question-form-modal-header">
+              <div>
+                <h2 id="question-form-modal-title">{isCreating ? '문제 추가' : '문제 수정'}</h2>
+                <p>객관식 문제 정보를 입력한 뒤 저장하면 문제은행 목록에 반영됩니다.</p>
+              </div>
+              <button
+                aria-label="문제 입력 창 닫기"
+                className="text-button question-form-modal-close"
+                disabled={isSubmitting}
+                type="button"
+                onClick={closeForm}
+              >
+                ×
+              </button>
             </div>
-          </div>
-          <QuestionForm
-            disabled={isSubmitting}
-            initialValues={editingQuestion ? toFormValues(editingQuestion) : undefined}
-            mode={isCreating ? 'create' : 'edit'}
-            onCancel={closeForm}
-            onSubmit={isCreating ? handleCreate : handleUpdate}
-          />
-        </section>
-      )}
+            <div className="question-form-modal-body">
+              {errorMessage ? <p className="table-subtitle question-form-modal-error">{errorMessage}</p> : null}
+              <QuestionForm
+                disabled={isSubmitting}
+                initialValues={editingQuestion ? toFormValues(editingQuestion) : undefined}
+                mode={isCreating ? 'create' : 'edit'}
+                onCancel={closeForm}
+                onSubmit={isCreating ? handleCreate : handleUpdate}
+              />
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
