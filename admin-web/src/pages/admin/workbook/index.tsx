@@ -12,6 +12,8 @@ const QUESTION_LIMIT = 100;
 const QUESTION_CANDIDATE_STATUS: ContentStatus = 'published';
 const WORKBOOK_TOTAL_SCORE = 100;
 
+type QuestionCandidateSortOrder = 'newest' | 'oldest';
+
 type QuestionRow = {
   id: string;
   subject: string;
@@ -142,6 +144,8 @@ export function WorkbookPage() {
   const [questionKeyword, setQuestionKeyword] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [questionSortOrder, setQuestionSortOrder] = useState<QuestionCandidateSortOrder>('newest');
+  const [selectedCandidateQuestionIds, setSelectedCandidateQuestionIds] = useState<string[]>([]);
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
   const [editingWorkbookId, setEditingWorkbookId] = useState<string | null>(null);
   const [isWorkbookLoading, setIsWorkbookLoading] = useState(false);
@@ -153,6 +157,34 @@ export function WorkbookPage() {
   const selectedQuestionIds = useMemo(
     () => new Set(selectedItems.map((item) => item.questionId)),
     [selectedItems],
+  );
+  const selectedCandidateQuestionIdSet = useMemo(
+    () => new Set(selectedCandidateQuestionIds),
+    [selectedCandidateQuestionIds],
+  );
+  const sortedQuestionCandidates = useMemo(() => {
+    const direction = questionSortOrder === 'newest' ? -1 : 1;
+
+    return [...questions].sort((a, b) => {
+      const timestampA = new Date(a.createdAt).getTime();
+      const timestampB = new Date(b.createdAt).getTime();
+
+      if (timestampA !== timestampB) {
+        return (timestampA - timestampB) * direction;
+      }
+
+      return a.id.localeCompare(b.id);
+    });
+  }, [questionSortOrder, questions]);
+  const visibleSelectedCandidateQuestions = useMemo(
+    () =>
+      sortedQuestionCandidates.filter(
+        (question) =>
+          selectedCandidateQuestionIdSet.has(question.id) &&
+          !selectedQuestionIds.has(question.id) &&
+          question.status === QUESTION_CANDIDATE_STATUS,
+      ),
+    [selectedCandidateQuestionIdSet, selectedQuestionIds, sortedQuestionCandidates],
   );
   const questionById = useMemo(() => new Map(questions.map((question) => [question.id, question])), [questions]);
   const selectedTotalScore = selectedItems.reduce((sum, item) => sum + item.points, 0);
@@ -228,6 +260,8 @@ export function WorkbookPage() {
         category: categoryFilter === 'all' ? undefined : categoryFilter,
         status: QUESTION_CANDIDATE_STATUS,
         type: 'multiple_choice',
+        sortBy: 'createdAt',
+        sortOrder: questionSortOrder === 'newest' ? 'desc' : 'asc',
       });
 
       setQuestions(response.data.map(toQuestionRow));
@@ -237,7 +271,7 @@ export function WorkbookPage() {
     } finally {
       setIsQuestionLoading(false);
     }
-  }, [categoryFilter, questionKeyword, subjectFilter]);
+  }, [categoryFilter, questionKeyword, questionSortOrder, subjectFilter]);
 
   const loadQuestionFilterOptions = useCallback(async () => {
     const response = await questionApi.listFilterOptions({ status: QUESTION_CANDIDATE_STATUS });
@@ -268,6 +302,14 @@ export function WorkbookPage() {
       setErrorMessage(error instanceof Error ? error.message : '문제은행 필터 목록을 불러오지 못했습니다.');
     });
   }, [loadQuestionFilterOptions]);
+
+  useEffect(() => {
+    setSelectedCandidateQuestionIds([]);
+  }, [categoryFilter, questionKeyword, questionSortOrder, subjectFilter]);
+
+  useEffect(() => {
+    setSelectedCandidateQuestionIds([]);
+  }, [selectedWorkbookId]);
 
   const openCreateForm = () => {
     setEditingWorkbookId(null);
@@ -331,18 +373,61 @@ export function WorkbookPage() {
   };
 
   const addQuestion = (question: QuestionRow) => {
-    if (!selectedWorkbook || selectedQuestionIds.has(question.id) || question.status !== 'published') return;
+    if (!selectedWorkbook || question.status !== QUESTION_CANDIDATE_STATUS) return;
 
-    setSelectedItems((current) => [
-      ...current,
-      {
-        id: `draft-${question.id}`,
-        questionId: question.id,
-        sequence: current.length + 1,
-        points: 10,
-        questionContent: question.content,
-      },
-    ]);
+    setSelectedItems((current) => {
+      if (current.some((item) => item.questionId === question.id)) return current;
+
+      return [
+        ...current,
+        {
+          id: `draft-${question.id}`,
+          questionId: question.id,
+          sequence: current.length + 1,
+          points: 10,
+          questionContent: question.content,
+        },
+      ];
+    });
+    setSelectedCandidateQuestionIds((current) => current.filter((questionId) => questionId !== question.id));
+  };
+
+  const toggleCandidateQuestion = (question: QuestionRow) => {
+    const canSelect =
+      Boolean(selectedWorkbook) && !selectedQuestionIds.has(question.id) && question.status === QUESTION_CANDIDATE_STATUS;
+
+    if (!canSelect) return;
+
+    setSelectedCandidateQuestionIds((current) =>
+      current.includes(question.id)
+        ? current.filter((questionId) => questionId !== question.id)
+        : [...current, question.id],
+    );
+  };
+
+  const addSelectedCandidateQuestions = () => {
+    if (!selectedWorkbook || visibleSelectedCandidateQuestions.length === 0) return;
+
+    setSelectedItems((current) => {
+      const existingQuestionIds = new Set(current.map((item) => item.questionId));
+      const additions = visibleSelectedCandidateQuestions.filter(
+        (question) => question.status === QUESTION_CANDIDATE_STATUS && !existingQuestionIds.has(question.id),
+      );
+
+      if (additions.length === 0) return current;
+
+      return [
+        ...current,
+        ...additions.map((question, index) => ({
+          id: `draft-${question.id}`,
+          questionId: question.id,
+          sequence: current.length + index + 1,
+          points: 10,
+          questionContent: question.content,
+        })),
+      ];
+    });
+    setSelectedCandidateQuestionIds([]);
   };
 
   const removeQuestion = (questionId: string) => {
@@ -560,13 +645,36 @@ export function WorkbookPage() {
                 ))}
               </select>
             </label>
+            <label className="search-field">
+              <span>정렬</span>
+              <select
+                value={questionSortOrder}
+                onChange={(event) => setQuestionSortOrder(event.target.value as QuestionCandidateSortOrder)}
+              >
+                <option value="newest">최신순</option>
+                <option value="oldest">오래된순</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="bulk-add-toolbar">
+            <span className="table-subtitle">선택된 후보 문제 {visibleSelectedCandidateQuestions.length}개</span>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={addSelectedCandidateQuestions}
+              disabled={!selectedWorkbook || visibleSelectedCandidateQuestions.length === 0}
+            >
+              선택 문제 일괄 추가
+            </button>
           </div>
 
           {isQuestionLoading ? <p className="table-subtitle">문제은행을 불러오는 중입니다.</p> : null}
           <div className="question-list">
-            {questions.map((question) => {
+            {sortedQuestionCandidates.map((question) => {
               const isSelected = selectedQuestionIds.has(question.id);
-              const canAdd = Boolean(selectedWorkbook) && !isSelected && question.status === 'published';
+              const canAdd = Boolean(selectedWorkbook) && !isSelected && question.status === QUESTION_CANDIDATE_STATUS;
+              const isCandidateChecked = selectedCandidateQuestionIdSet.has(question.id) && canAdd;
 
               return (
                 <article
@@ -575,6 +683,14 @@ export function WorkbookPage() {
                   key={question.id}
                   onDragStart={(event) => handleDragStart(event, question.id)}
                 >
+                  <label className="candidate-checkbox" aria-label={`${getQuestionPreview(question.content)} 선택`}>
+                    <input
+                      type="checkbox"
+                      checked={isCandidateChecked}
+                      disabled={!canAdd}
+                      onChange={() => toggleCandidateQuestion(question)}
+                    />
+                  </label>
                   <div>
                     <div style={questionContentStyle}>{getQuestionPreview(question.content)}</div>
                     <span className="question-meta">
@@ -587,12 +703,12 @@ export function WorkbookPage() {
                     onClick={() => addQuestion(question)}
                     disabled={!canAdd}
                   >
-                    {isSelected ? '추가됨' : question.status === 'published' ? '추가' : '추가 불가'}
+                    {isSelected ? '추가됨' : question.status === QUESTION_CANDIDATE_STATUS ? '추가' : '추가 불가'}
                   </button>
                 </article>
               );
             })}
-            {questions.length === 0 ? (
+            {sortedQuestionCandidates.length === 0 ? (
               <div className="empty-drop">
                 <strong>조건에 맞는 문제가 없습니다.</strong>
                 <p>검색어 또는 필터를 변경해보세요.</p>
