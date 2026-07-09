@@ -16,6 +16,8 @@ export type ScoreSubmissionRow = {
 
 type ScoreSubmissionTableProps = {
   submissions: ScoreSubmissionRow[];
+  deletingSubmissionId?: string;
+  onDelete: (submission: ScoreSubmissionRow) => void;
   onViewDetail: (submissionId: string) => void;
 };
 
@@ -37,7 +39,12 @@ const formatDate = (value?: string | null) => {
   }).format(new Date(value));
 };
 
-export function ScoreSubmissionTable({ submissions, onViewDetail }: ScoreSubmissionTableProps) {
+export function ScoreSubmissionTable({
+  submissions,
+  deletingSubmissionId,
+  onDelete,
+  onViewDetail,
+}: ScoreSubmissionTableProps) {
   return (
     <div className="table-wrap">
       <table>
@@ -50,7 +57,7 @@ export function ScoreSubmissionTable({ submissions, onViewDetail }: ScoreSubmiss
             <th>정답/오답</th>
             <th>상태</th>
             <th>제출일</th>
-            <th>오답 보기</th>
+            <th>관리</th>
           </tr>
         </thead>
         <tbody>
@@ -75,9 +82,19 @@ export function ScoreSubmissionTable({ submissions, onViewDetail }: ScoreSubmiss
               </td>
               <td>{formatDate(submission.submittedAt)}</td>
               <td>
-                <button className="text-button" type="button" onClick={() => onViewDetail(submission.id)}>
-                  오답 보기
-                </button>
+                <div className="row-actions">
+                  <button className="text-button" type="button" onClick={() => onViewDetail(submission.id)}>
+                    오답 보기
+                  </button>
+                  <button
+                    className="danger-button"
+                    disabled={deletingSubmissionId === submission.id}
+                    type="button"
+                    onClick={() => onDelete(submission)}
+                  >
+                    {deletingSubmissionId === submission.id ? '삭제 중...' : '삭제'}
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

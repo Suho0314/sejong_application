@@ -58,8 +58,18 @@ type SubmissionDetailResponse = {
   data: SubmissionDetailApiItem;
 };
 
+type DeleteSubmissionResponse = {
+  success: boolean;
+};
+
 export const submissionApi = {
   get(submissionId: string) {
     return apiRequest<SubmissionDetailResponse>(`/admin/submissions/${submissionId}`);
+  },
+
+  delete(submissionId: string) {
+    return apiRequest<DeleteSubmissionResponse>(`/admin/submissions/${submissionId}`, {
+      method: 'DELETE',
+    });
   },
 };
