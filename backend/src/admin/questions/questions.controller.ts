@@ -22,6 +22,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { BulkUpdateQuestionCategoryDto } from './dto/bulk-update-question-category.dto';
 import { BulkUpdateQuestionStatusDto } from './dto/bulk-update-question-status.dto';
+import { BulkUpdateQuestionSubjectDto } from './dto/bulk-update-question-subject.dto';
 import { ConfirmPdfQuestionImportDto } from './dto/confirm-pdf-question-import.dto';
 import { PreviewPdfQuestionImportDto } from './dto/preview-pdf-question-import.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
@@ -95,6 +96,11 @@ export class QuestionsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.questionPdfImportService.confirm(body, request.user?.sub);
+  }
+
+  @Patch('bulk/subject')
+  bulkUpdateQuestionSubject(@Body() body: BulkUpdateQuestionSubjectDto) {
+    return this.questionsService.bulkUpdateQuestionSubject(body);
   }
 
   @Patch('bulk/category')

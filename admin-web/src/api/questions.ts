@@ -80,6 +80,11 @@ export type BulkUpdateQuestionStatusPayload = {
   status: ContentStatus;
 };
 
+export type BulkUpdateQuestionSubjectPayload = {
+  questionIds: string[];
+  subject: string;
+};
+
 export type BulkUpdateQuestionCategoryPayload = {
   questionIds: string[];
   category: string;
@@ -133,6 +138,14 @@ type BulkUpdateQuestionStatusResponse = {
   data: {
     updatedCount: number;
     status: ContentStatus;
+    questionIds: string[];
+  };
+};
+
+type BulkUpdateQuestionSubjectResponse = {
+  data: {
+    updatedCount: number;
+    subject: string;
     questionIds: string[];
   };
 };
@@ -239,6 +252,13 @@ export const questionApi = {
 
   bulkUpdateStatus(payload: BulkUpdateQuestionStatusPayload) {
     return apiRequest<BulkUpdateQuestionStatusResponse>('/admin/questions/bulk/status', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  bulkUpdateSubject(payload: BulkUpdateQuestionSubjectPayload) {
+    return apiRequest<BulkUpdateQuestionSubjectResponse>('/admin/questions/bulk/subject', {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });

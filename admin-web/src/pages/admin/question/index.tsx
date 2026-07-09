@@ -97,8 +97,10 @@ export function QuestionPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<string>>(new Set());
   const [bulkTargetStatus, setBulkTargetStatus] = useState<ContentStatus>('published');
+  const [bulkSubject, setBulkSubject] = useState('');
   const [bulkCategory, setBulkCategory] = useState('');
   const [isBulkStatusUpdating, setIsBulkStatusUpdating] = useState(false);
+  const [isBulkSubjectUpdating, setIsBulkSubjectUpdating] = useState(false);
   const [isBulkCategoryUpdating, setIsBulkCategoryUpdating] = useState(false);
   const [bulkSuccessMessage, setBulkSuccessMessage] = useState('');
   const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
@@ -273,6 +275,40 @@ export function QuestionPage() {
       setErrorMessage(error instanceof Error ? error.message : '문제 상태를 일괄 변경하지 못했습니다.');
     } finally {
       setIsBulkStatusUpdating(false);
+    }
+  };
+
+  const handleBulkUpdateSubject = async () => {
+    const nextSubject = normalizeTaxonomyInput(bulkSubject);
+
+    if (selectedQuestionCount === 0 || !nextSubject) return;
+
+    const confirmed = window.confirm(
+      `선택한 ${selectedQuestionCount}개 문제의 과목을 "${nextSubject}"으로 변경할까요?`,
+    );
+
+    if (!confirmed) return;
+
+    setIsBulkSubjectUpdating(true);
+    setErrorMessage('');
+    setBulkSuccessMessage('');
+
+    try {
+      const response = await questionApi.bulkUpdateSubject({
+        questionIds: Array.from(selectedQuestionIds),
+        subject: nextSubject,
+      });
+
+      setBulkSuccessMessage(
+        `${response.data.updatedCount}개 문제 과목이 "${response.data.subject}"(으)로 변경되었습니다.`,
+      );
+      setSelectedQuestionIds(new Set());
+      setBulkSubject('');
+      await Promise.all([loadQuestions(currentPage), loadFilterOptions()]);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '문제 과목을 일괄 변경하지 못했습니다.');
+    } finally {
+      setIsBulkSubjectUpdating(false);
     }
   };
 
@@ -801,6 +837,38 @@ export function QuestionPage() {
 
         <div className="toolbar bulk-actions-toolbar">
           <span className="table-subtitle bulk-selection-count">선택된 문제 {selectedQuestionCount}개</span>
+          <label className="search-field bulk-subject-field">
+            <span>변경할 과목</span>
+            <input
+              disabled={selectedQuestionCount === 0 || isBulkSubjectUpdating}
+              value={bulkSubject}
+              onChange={(event) => setBulkSubject(event.target.value)}
+            />
+          </label>
+          <button
+            className="secondary-button"
+            disabled={selectedQuestionCount === 0 || isBulkSubjectUpdating || !normalizeTaxonomyInput(bulkSubject)}
+            type="button"
+            onClick={() => void handleBulkUpdateSubject()}
+          >
+            {isBulkSubjectUpdating ? '과목 변경 중...' : '선택 과목 일괄 변경'}
+          </button>
+          <label className="search-field bulk-category-field">
+            <span>변경할 카테고리</span>
+            <input
+              disabled={selectedQuestionCount === 0 || isBulkCategoryUpdating}
+              value={bulkCategory}
+              onChange={(event) => setBulkCategory(event.target.value)}
+            />
+          </label>
+          <button
+            className="secondary-button"
+            disabled={selectedQuestionCount === 0 || isBulkCategoryUpdating || !normalizeTaxonomyInput(bulkCategory)}
+            type="button"
+            onClick={() => void handleBulkUpdateCategory()}
+          >
+            {isBulkCategoryUpdating ? '카테고리 변경 중...' : '카테고리 일괄 변경'}
+          </button>
           <label className="search-field bulk-status-field">
             <span>변경할 상태</span>
             <select
@@ -822,22 +890,6 @@ export function QuestionPage() {
             onClick={() => void handleBulkUpdateStatus()}
           >
             {isBulkStatusUpdating ? '상태 변경 중...' : '선택 상태 일괄 변경'}
-          </button>
-          <label className="search-field bulk-category-field">
-            <span>변경할 카테고리</span>
-            <input
-              disabled={selectedQuestionCount === 0 || isBulkCategoryUpdating}
-              value={bulkCategory}
-              onChange={(event) => setBulkCategory(event.target.value)}
-            />
-          </label>
-          <button
-            className="secondary-button"
-            disabled={selectedQuestionCount === 0 || isBulkCategoryUpdating || !normalizeTaxonomyInput(bulkCategory)}
-            type="button"
-            onClick={() => void handleBulkUpdateCategory()}
-          >
-            {isBulkCategoryUpdating ? '카테고리 변경 중...' : '카테고리 일괄 변경'}
           </button>
         </div>
 
