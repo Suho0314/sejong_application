@@ -495,8 +495,8 @@ export function QuestionPage() {
       </section>
 
       {isPdfImportOpen ? (
-        <section className="dashboard-panel">
-          <div className="panel-header">
+        <section className="dashboard-panel pdf-import-panel">
+          <div className="panel-header pdf-import-header">
             <div>
               <h2>PDF 문제 일괄 등록</h2>
               <p>문제지 PDF와 정답지 PDF를 분석한 뒤, 선택한 문항만 문제은행 draft로 생성합니다.</p>
@@ -506,68 +506,77 @@ export function QuestionPage() {
             </button>
           </div>
 
-          <div className="cohort-form">
-            <div className="form-grid">
-              <label>
-                <span>문제지 PDF</span>
+          <div className="cohort-form pdf-import-form">
+            <div className="pdf-upload-grid">
+              <label className="pdf-upload-card">
+                <span className="pdf-upload-label">문제지 PDF</span>
                 <input
                   accept="application/pdf,.pdf"
                   disabled={isParsingPdf || isCreatingDrafts}
                   type="file"
                   onChange={(event) => setQuestionPdfFile(event.target.files?.[0] ?? null)}
                 />
+                <small className="pdf-file-state">
+                  {questionPdfFile ? questionPdfFile.name : '선택된 파일 없음'}
+                </small>
               </label>
-              <label>
-                <span>정답지 PDF</span>
+              <label className="pdf-upload-card">
+                <span className="pdf-upload-label">정답지 PDF</span>
                 <input
                   accept="application/pdf,.pdf"
                   disabled={isParsingPdf || isCreatingDrafts}
                   type="file"
                   onChange={(event) => setAnswerPdfFile(event.target.files?.[0] ?? null)}
                 />
+                <small className="pdf-file-state">
+                  {answerPdfFile ? answerPdfFile.name : '선택된 파일 없음'}
+                </small>
               </label>
             </div>
 
-            <div className="form-actions">
-              <button
-                className="primary-button"
-                disabled={isParsingPdf || isCreatingDrafts}
-                type="button"
-                onClick={() => void handlePdfPreview()}
-              >
-                {isParsingPdf ? 'PDF 분석 중...' : '미리보기 생성'}
-              </button>
-              <span className="table-subtitle">
-                텍스트 기반 PDF만 지원하며 원본 파일은 저장하지 않습니다.
-              </span>
-            </div>
+            <div className="pdf-import-control-grid">
+              <div className="pdf-ai-card">
+                <div className="pdf-ai-row">
+                  <label className="pdf-ai-toggle">
+                    <input
+                      checked={useAiAssist}
+                      disabled={isParsingPdf || isCreatingDrafts}
+                      type="checkbox"
+                      onChange={(event) => setUseAiAssist(event.target.checked)}
+                    />
+                    <span>AI 보정 사용</span>
+                  </label>
+                  <label className="pdf-ai-mode">
+                    <span>AI 보정 범위</span>
+                    <select
+                      disabled={!useAiAssist || isParsingPdf || isCreatingDrafts}
+                      value={aiAssistMode}
+                      onChange={(event) => setAiAssistMode(event.target.value as 'all' | 'review_only')}
+                    >
+                      <option value="all">전체 보정</option>
+                      <option value="review_only">검토 필요 문항만 보정</option>
+                    </select>
+                  </label>
+                </div>
+                <p className="pdf-helper-text">
+                  AI 보정 결과도 반드시 미리보기에서 확인한 뒤 생성하세요. API Key는 Backend에서만 사용됩니다.
+                </p>
+              </div>
 
-            <div className="form-grid">
-              <label className="search-field">
-                <span>AI 보정</span>
-                <input
-                  checked={useAiAssist}
+              <div className="pdf-import-actions">
+                <button
+                  className="primary-button"
                   disabled={isParsingPdf || isCreatingDrafts}
-                  type="checkbox"
-                  onChange={(event) => setUseAiAssist(event.target.checked)}
-                />
-                <span>AI 보정 사용</span>
-              </label>
-              <label>
-                <span>AI 보정 범위</span>
-                <select
-                  disabled={!useAiAssist || isParsingPdf || isCreatingDrafts}
-                  value={aiAssistMode}
-                  onChange={(event) => setAiAssistMode(event.target.value as 'all' | 'review_only')}
+                  type="button"
+                  onClick={() => void handlePdfPreview()}
                 >
-                  <option value="all">전체 보정</option>
-                  <option value="review_only">검토 필요 문항만 보정</option>
-                </select>
-              </label>
+                  {isParsingPdf ? 'PDF 분석 중...' : '미리보기 생성'}
+                </button>
+                <span className="pdf-helper-text">
+                  텍스트 기반 PDF만 지원하며 원본 파일은 저장하지 않습니다.
+                </span>
+              </div>
             </div>
-            <p className="table-subtitle">
-              AI 보정 결과도 반드시 미리보기에서 확인한 뒤 생성하세요. API Key는 Backend에서만 사용됩니다.
-            </p>
 
             {importErrorMessage ? <p className="table-subtitle">{importErrorMessage}</p> : null}
             {importSuccessMessage ? <p className="table-subtitle">{importSuccessMessage}</p> : null}

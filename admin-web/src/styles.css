@@ -645,6 +645,120 @@ th {
   outline: 3px solid rgba(11, 148, 68, 0.16);
 }
 
+.pdf-import-panel {
+  border-color: rgba(11, 148, 68, 0.18);
+}
+
+.pdf-import-header {
+  align-items: flex-start;
+}
+
+.pdf-import-form {
+  gap: 20px;
+}
+
+.pdf-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pdf-upload-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-primary-soft);
+  padding: 16px;
+}
+
+.pdf-upload-label {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.pdf-upload-card input[type="file"] {
+  background: #fff;
+}
+
+.pdf-file-state,
+.pdf-helper-text {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.pdf-import-control-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.pdf-ai-card,
+.pdf-import-actions {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #fff;
+  padding: 16px;
+}
+
+.pdf-ai-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.cohort-form .pdf-ai-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+}
+
+.cohort-form .pdf-ai-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--color-primary);
+}
+
+.cohort-form .pdf-ai-toggle span {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.pdf-ai-mode {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 7px;
+  min-width: 180px;
+}
+
+.pdf-import-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.pdf-import-actions .primary-button {
+  width: 100%;
+}
+
+.pdf-ai-card .pdf-helper-text,
+.pdf-import-actions .pdf-helper-text {
+  margin: 10px 0 0;
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;
@@ -988,6 +1102,20 @@ th {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .pdf-upload-grid,
+  .pdf-import-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pdf-ai-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pdf-import-actions {
+    align-items: stretch;
   }
 
   .form-actions {
