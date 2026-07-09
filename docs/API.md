@@ -2689,6 +2689,24 @@ Response:
 }
 ```
 
+### 강사용 제출 기록 삭제
+
+| 항목 | 내용 |
+| --- | --- |
+| Method | `DELETE` |
+| URL | `/api/admin/submissions/{submissionId}` |
+| StatusCode | `200`, `401`, `403`, `404` |
+
+관리자가 특정 제출 기록을 삭제한다. 실제 레코드는 hard delete하지 않고 `submissions`와 관련 `submission_answers`를 soft delete 처리한다. 삭제된 제출은 성적 목록, 평균 점수, 평균 정답률, 문항별 오답률 집계와 학생 재제출 횟수 계산에서 제외된다.
+
+Response:
+
+```json
+{
+  "success": true
+}
+```
+
 ### 기수별 성적 요약 조회
 
 | 항목 | 내용 |

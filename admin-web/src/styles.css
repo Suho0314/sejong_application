@@ -534,6 +534,18 @@ th {
   padding: 7px 10px;
 }
 
+.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.row-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .toolbar {
   display: flex;
   align-items: flex-end;

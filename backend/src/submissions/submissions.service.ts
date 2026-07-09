@@ -238,6 +238,58 @@ export class SubmissionsService {
     return this.getSubmissionDetail(submission);
   }
 
+  async deleteAdminSubmission(submissionId: string): Promise<void> {
+    const client = await this.databaseService.getPool().connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const submissionResult = await client.query<{ id: string }>(
+        `SELECT id
+         FROM submissions
+         WHERE id = $1
+           AND deleted_at IS NULL
+         FOR UPDATE`,
+        [submissionId],
+      );
+
+      if (submissionResult.rowCount === 0) {
+        throw new NotFoundException({
+          error: {
+            code: 'SUBMISSION_NOT_FOUND',
+            message: '제출 내역을 찾을 수 없습니다.',
+            details: [],
+          },
+        });
+      }
+
+      await client.query(
+        `UPDATE submission_answers
+         SET deleted_at = now(),
+             updated_at = now()
+         WHERE submission_id = $1
+           AND deleted_at IS NULL`,
+        [submissionId],
+      );
+
+      await client.query(
+        `UPDATE submissions
+         SET deleted_at = now(),
+             updated_at = now()
+         WHERE id = $1
+           AND deleted_at IS NULL`,
+        [submissionId],
+      );
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   private async listSubmissions(query: ListSubmissionsDto, forcedStudentId?: string) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;

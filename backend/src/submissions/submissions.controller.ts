@@ -1,7 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -77,6 +80,14 @@ export class SubmissionsController {
   @Roles('admin', 'teacher')
   getAdminSubmission(@Param('submissionId', ParseUUIDPipe) submissionId: string) {
     return this.submissionsService.getAdminSubmission(submissionId);
+  }
+
+  @Delete('admin/submissions/:submissionId')
+  @Roles('admin', 'teacher')
+  @HttpCode(HttpStatus.OK)
+  async deleteAdminSubmission(@Param('submissionId', ParseUUIDPipe) submissionId: string) {
+    await this.submissionsService.deleteAdminSubmission(submissionId);
+    return { success: true };
   }
 }
 

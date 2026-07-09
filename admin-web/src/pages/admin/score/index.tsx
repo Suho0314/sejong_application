@@ -200,6 +200,7 @@ export function ScorePage() {
   const [isOptionLoading, setIsOptionLoading] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isQuestionStatsLoading, setIsQuestionStatsLoading] = useState(false);
+  const [deletingSubmissionId, setDeletingSubmissionId] = useState<string | undefined>();
   const [errorMessage, setErrorMessage] = useState('');
 
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -321,6 +322,35 @@ export function ScorePage() {
       setErrorMessage(error instanceof Error ? error.message : '제출 상세를 불러오지 못했습니다.');
     } finally {
       setIsDetailLoading(false);
+    }
+  };
+
+  const deleteSubmission = async (submission: ScoreSubmissionRow) => {
+    const confirmed = window.confirm(
+      `${submission.studentName} 학생의 "${submission.workbookTitle}" 제출 기록을 삭제하시겠습니까?`,
+    );
+
+    if (!confirmed) return;
+
+    setDeletingSubmissionId(submission.id);
+    setErrorMessage('');
+
+    try {
+      await submissionApi.delete(submission.id);
+      if (selectedSubmission?.id === submission.id) {
+        setSelectedSubmission(null);
+      }
+
+      const nextPage = rows.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+      if (nextPage !== page) {
+        setPage(nextPage);
+      }
+      await loadScores(nextPage);
+      alert('제출 기록을 삭제했습니다.');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '제출 기록을 삭제하지 못했습니다.');
+    } finally {
+      setDeletingSubmissionId(undefined);
     }
   };
 
@@ -448,7 +478,12 @@ export function ScorePage() {
           <p className="table-subtitle">문항별 오답률을 보려면 문제집을 먼저 선택해주세요.</p>
         ) : null}
         {isLoading ? <p className="table-subtitle">성적 목록을 불러오는 중입니다.</p> : null}
-        <ScoreSubmissionTable submissions={rows} onViewDetail={viewSubmissionDetail} />
+        <ScoreSubmissionTable
+          submissions={rows}
+          deletingSubmissionId={deletingSubmissionId}
+          onDelete={deleteSubmission}
+          onViewDetail={viewSubmissionDetail}
+        />
         <Pagination currentPage={currentPage} totalItems={totalItems} totalPages={totalPages} onPageChange={setPage} />
       </section>
 
