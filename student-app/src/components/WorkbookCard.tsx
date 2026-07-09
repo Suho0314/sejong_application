@@ -10,11 +10,13 @@ type WorkbookCardProps = {
 };
 
 export function WorkbookCard({ workbook, progressRate, onPress }: WorkbookCardProps) {
+  const subject = workbook.subject.trim();
+
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.content}>
         <View style={styles.topRow}>
-          <Text style={styles.subject}>{workbook.subject}</Text>
+          {subject ? <Text style={styles.subject}>{subject}</Text> : <View />}
           <Text
             style={[
               styles.status,

@@ -58,7 +58,7 @@ export function WorkbookDetailScreen({ navigation, route }: ScreenProps<'Workboo
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.heroCard}>
           <View style={styles.badgeRow}>
-            <Text style={styles.subject}>{workbook.subject ?? '간호학'}</Text>
+            {workbook.subject.trim() ? <Text style={styles.subject}>{workbook.subject.trim()}</Text> : null}
             <Text style={styles.status}>{workbookStatusLabel[effectiveStatus]}</Text>
           </View>
           <Text style={styles.title}>{workbook.title ?? '제목 없는 문제집'}</Text>

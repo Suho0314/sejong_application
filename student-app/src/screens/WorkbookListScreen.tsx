@@ -30,7 +30,14 @@ export function WorkbookListScreen({
   const [activeFilter, setActiveFilter] = useState<WorkbookFilter>('all');
   const [activeSubject, setActiveSubject] = useState<string>('all');
   const subjects = useMemo(
-    () => Array.from(new Set(workbooks.map((workbook) => workbook.subject))),
+    () =>
+      Array.from(
+        new Set(
+          workbooks
+            .map((workbook) => workbook.subject.trim())
+            .filter(Boolean),
+        ),
+      ).sort((left, right) => left.localeCompare(right, 'ko')),
     [workbooks],
   );
 
@@ -39,8 +46,15 @@ export function WorkbookListScreen({
     setActiveSubject('all');
   }, [cohort.id]);
 
+  useEffect(() => {
+    if (activeSubject !== 'all' && !subjects.includes(activeSubject)) {
+      setActiveSubject('all');
+    }
+  }, [activeSubject, subjects]);
+
   const filteredWorkbooks = workbooks.filter((workbook) => {
-    const matchesSubject = activeSubject === 'all' || workbook.subject === activeSubject;
+    const workbookSubject = workbook.subject.trim();
+    const matchesSubject = activeSubject === 'all' || workbookSubject === activeSubject;
 
     if (activeFilter === 'active') {
       return matchesSubject

@@ -23,6 +23,7 @@ export type StudentAssignmentApiItem = {
   workbookId: string;
   workbookTitle: string;
   workbookDescription: string | null;
+  subject: string | null;
   cohortId: string;
   cohortName: string;
   status: 'scheduled' | 'open' | 'closed';

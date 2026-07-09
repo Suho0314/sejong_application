@@ -34,12 +34,17 @@ const StudentDataContext = createContext<StudentDataContextValue | null>(null);
 const getAssignmentQuestions = (assignment: StudentAssignmentApiItem) =>
   Array.isArray(assignment.questions) ? assignment.questions : [];
 
+const getAssignmentSubject = (assignment: StudentAssignmentApiItem) =>
+  assignment.subject?.trim()
+  || getAssignmentQuestions(assignment).find((question) => question.subject?.trim())?.subject.trim()
+  || '';
+
 const toWorkbook = (assignment: StudentAssignmentApiItem): Workbook => ({
   id: assignment.assignmentId,
   cohortId: assignment.cohortId,
   title: assignment.workbookTitle ?? '제목 없는 문제집',
   description: assignment.workbookDescription ?? '배포된 문제집입니다.',
-  subject: getAssignmentQuestions(assignment)[0]?.subject ?? '간호학',
+  subject: getAssignmentSubject(assignment),
   chapterCount: Math.max(
     1,
     new Set(getAssignmentQuestions(assignment).map((question) => question.category ?? '기본')).size,

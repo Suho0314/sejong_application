@@ -327,6 +327,10 @@ export class SubmissionsService {
       workbook_assignments.workbook_id,
       workbooks.title AS workbook_title,
       workbooks.description AS workbook_description,
+      (
+        ARRAY_AGG(NULLIF(BTRIM(questions.subject), '') ORDER BY workbook_questions.sequence)
+        FILTER (WHERE NULLIF(BTRIM(questions.subject), '') IS NOT NULL)
+      )[1] AS subject,
       workbook_assignments.cohort_id,
       cohorts.name AS cohort_name,
       workbook_assignments.status,
@@ -344,6 +348,9 @@ export class SubmissionsService {
     LEFT JOIN workbook_questions
       ON workbook_questions.workbook_id = workbooks.id
      AND workbook_questions.deleted_at IS NULL
+    LEFT JOIN questions
+      ON questions.id = workbook_questions.question_id
+     AND questions.deleted_at IS NULL
     LEFT JOIN submissions
       ON submissions.workbook_assignment_id = workbook_assignments.id
      AND submissions.deleted_at IS NULL`;
@@ -698,6 +705,7 @@ export class SubmissionsService {
       workbookId: row.workbook_id,
       workbookTitle: row.workbook_title,
       workbookDescription: row.workbook_description,
+      subject: row.subject,
       cohortId: row.cohort_id,
       cohortName: row.cohort_name,
       status: row.status,

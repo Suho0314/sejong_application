@@ -11,6 +11,7 @@ export type StudentAssignmentRow = {
   workbook_id: string;
   workbook_title: string;
   workbook_description: string | null;
+  subject: string | null;
   cohort_id: string;
   cohort_name: string;
   status: AssignmentStatus;
