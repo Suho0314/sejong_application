@@ -265,7 +265,7 @@ Unique:
 | `workbook_id` | UUID | FK `workbooks.id`, NOT NULL |
 | `question_id` | UUID | FK `questions.id`, NOT NULL |
 | `sequence` | integer | NOT NULL, `> 0` |
-| `points` | integer | NOT NULL, `>= 0` |
+| `points` | numeric(7,2) | NOT NULL, `>= 0` |
 | `is_required` | boolean | NOT NULL |
 | `created_at` | timestamptz | NOT NULL |
 | `updated_at` | timestamptz | NOT NULL |
@@ -352,8 +352,8 @@ Unique:
 | `started_at` | timestamptz | NOT NULL |
 | `submitted_at` | timestamptz | nullable |
 | `graded_at` | timestamptz | nullable |
-| `total_points` | integer | NOT NULL |
-| `earned_points` | integer | NOT NULL |
+| `total_points` | numeric(7,2) | NOT NULL |
+| `earned_points` | numeric(7,2) | NOT NULL |
 | `score` | numeric(5,2) | NOT NULL, 0~100 |
 | `correct_count` | integer | NOT NULL |
 | `wrong_count` | integer | NOT NULL |
@@ -380,7 +380,7 @@ Unique:
 | `selected_choice_id` | UUID | FK `question_choices.id`, nullable |
 | `correct_choice_id` | UUID | FK `question_choices.id`, nullable |
 | `is_correct` | boolean | NOT NULL |
-| `earned_points` | integer | NOT NULL |
+| `earned_points` | numeric(7,2) | NOT NULL |
 | `graded_at` | timestamptz | nullable |
 | `created_at` | timestamptz | NOT NULL |
 | `updated_at` | timestamptz | NOT NULL |

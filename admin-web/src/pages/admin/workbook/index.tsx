@@ -11,6 +11,10 @@ const WORKBOOK_PAGE_SIZE = 5;
 const QUESTION_LIMIT = 100;
 const QUESTION_CANDIDATE_STATUS: ContentStatus = 'published';
 const WORKBOOK_TOTAL_SCORE = 100;
+const SCORE_PRECISION = 2;
+const SCORE_SCALE = 10 ** SCORE_PRECISION;
+const WORKBOOK_TOTAL_SCORE_UNITS = WORKBOOK_TOTAL_SCORE * SCORE_SCALE;
+const SCORE_TOTAL_TOLERANCE = 0.01;
 
 type QuestionCandidateSortOrder = 'newest' | 'oldest';
 
@@ -94,7 +98,7 @@ const toWorkbookQuestionRow = (item: WorkbookQuestionApiItem): WorkbookQuestionR
   id: item.id,
   questionId: item.questionId,
   sequence: item.sequence,
-  points: item.points,
+  points: roundScore(item.points),
   questionContent: item.question?.content,
 });
 
@@ -116,16 +120,23 @@ const reindexQuestions = (items: WorkbookQuestionRow[]) =>
     sequence: index + 1,
   }));
 
+const roundScore = (value: number) => Number((Math.round(value * SCORE_SCALE) / SCORE_SCALE).toFixed(SCORE_PRECISION));
+
+const formatScore = (value: number) => Number(value.toFixed(SCORE_PRECISION)).toString();
+
+const sumScores = (items: WorkbookQuestionRow[]) =>
+  roundScore(items.reduce((sum, item) => sum + Number(item.points), 0));
+
 const distributePoints = (items: WorkbookQuestionRow[]) => {
   const count = items.length;
   if (count === 0) return items;
 
-  const base = Math.floor(WORKBOOK_TOTAL_SCORE / count);
-  const remainder = WORKBOOK_TOTAL_SCORE % count;
+  const baseUnits = Math.floor(WORKBOOK_TOTAL_SCORE_UNITS / count);
+  const remainderUnits = WORKBOOK_TOTAL_SCORE_UNITS % count;
 
   return items.map((item, index) => ({
     ...item,
-    points: index < remainder ? base + 1 : base,
+    points: (baseUnits + (index < remainderUnits ? 1 : 0)) / SCORE_SCALE,
   }));
 };
 
@@ -191,9 +202,9 @@ export function WorkbookPage() {
     selectableCandidateQuestions.length > 0 &&
     selectableCandidateQuestions.every((question) => selectedCandidateQuestionIdSet.has(question.id));
   const questionById = useMemo(() => new Map(questions.map((question) => [question.id, question])), [questions]);
-  const selectedTotalScore = selectedItems.reduce((sum, item) => sum + item.points, 0);
+  const selectedTotalScore = sumScores(selectedItems);
   const hasSelectedQuestions = selectedItems.length > 0;
-  const isSelectedTotalScoreValid = selectedTotalScore === WORKBOOK_TOTAL_SCORE;
+  const isSelectedTotalScoreValid = Math.abs(selectedTotalScore - WORKBOOK_TOTAL_SCORE) < SCORE_TOTAL_TOLERANCE;
   const workbookTotalPages = Math.max(1, Math.ceil(workbookTotalItems / WORKBOOK_PAGE_SIZE));
   const workbookCurrentPage = Math.min(workbookPage, workbookTotalPages);
 
@@ -497,7 +508,7 @@ export function WorkbookPage() {
         questions: selectedItems.map((item, index) => ({
           questionId: item.questionId,
           sequence: index + 1,
-          points: item.points,
+          points: roundScore(item.points),
           isRequired: true,
         })),
       });
@@ -755,7 +766,7 @@ export function WorkbookPage() {
             </div>
             <div className="workbook-summary">
               <strong>{selectedItems.length}문항 선택</strong>
-              <span>{selectedTotalScore}점</span>
+              <span>{formatScore(selectedTotalScore)}점</span>
               {selectedWorkbook ? <span>합격 {selectedWorkbook.passScore}점</span> : null}
               {selectedWorkbook ? (
                 <span className={`status-pill status-${selectedWorkbook.status}`}>
@@ -773,7 +784,7 @@ export function WorkbookPage() {
                 <strong className={isSelectedTotalScoreValid ? 'score-total-ok' : 'score-total-warning'}>
                   {isSelectedTotalScoreValid
                     ? `총점 정상: ${WORKBOOK_TOTAL_SCORE}점`
-                    : `현재 총점: ${selectedTotalScore}점 / ${WORKBOOK_TOTAL_SCORE}점`}
+                    : `현재 총점: ${formatScore(selectedTotalScore)}점 / ${WORKBOOK_TOTAL_SCORE}점`}
                 </strong>
                 <p>
                   {hasSelectedQuestions
@@ -824,11 +835,15 @@ export function WorkbookPage() {
                         <span>점수</span>
                         <input
                           min={0}
+                          step="0.01"
                           type="number"
-                          value={item.points}
-                          onChange={(event) =>
-                            updateQuestionConfig(item.questionId, { points: Number(event.target.value) })
-                          }
+                          value={formatScore(item.points)}
+                          onChange={(event) => {
+                            const nextPoints = Number(event.target.value);
+                            updateQuestionConfig(item.questionId, {
+                              points: Number.isFinite(nextPoints) ? Math.max(0, roundScore(nextPoints)) : 0,
+                            });
+                          }}
                         />
                       </label>
                       <button

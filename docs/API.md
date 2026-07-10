@@ -1868,6 +1868,8 @@ Response:
 
 ### 문제집 문항 구성 변경
 
+문항별 `points`는 소수점 둘째 자리까지 허용한다. 예를 들어 49문항을 100점으로 자동 배분하는 경우 `2.04`, `2.05` 같은 소수 배점을 저장할 수 있다.
+
 | 항목 | 내용 |
 | --- | --- |
 | Method | `PUT` |
@@ -1882,13 +1884,13 @@ Request:
     {
       "questionId": "question-uuid",
       "sequence": 1,
-      "points": 5,
+      "points": 2.04,
       "isRequired": true
     },
     {
       "questionId": "question-uuid-2",
       "sequence": 2,
-      "points": 5,
+      "points": 2.05,
       "isRequired": true
     }
   ]

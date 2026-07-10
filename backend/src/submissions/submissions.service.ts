@@ -140,8 +140,8 @@ export class SubmissionsService {
       body.answers.map((answer) => [answer.workbookQuestionId, answer.selectedChoiceId ?? null]),
     );
     const gradedAnswers = this.gradeAnswers(questions, choicesByQuestionId, answersByWorkbookQuestionId);
-    const totalPoints = questions.reduce((sum, question) => sum + question.points, 0);
-    const earnedPoints = gradedAnswers.reduce((sum, answer) => sum + answer.earnedPoints, 0);
+    const totalPoints = Number(questions.reduce((sum, question) => sum + Number(question.points), 0).toFixed(2));
+    const earnedPoints = Number(gradedAnswers.reduce((sum, answer) => sum + Number(answer.earnedPoints), 0).toFixed(2));
     const correctCount = gradedAnswers.filter((answer) => answer.isCorrect).length;
     const totalQuestions = questions.length;
     const wrongCount = totalQuestions - correctCount;
@@ -668,7 +668,7 @@ export class SubmissionsService {
         selectedChoiceId: selectedChoice?.id ?? null,
         correctChoiceId: correctChoice?.id ?? null,
         isCorrect,
-        earnedPoints: isCorrect ? question.points : 0,
+        earnedPoints: isCorrect ? Number(question.points) : 0,
       };
     });
   }
@@ -778,7 +778,7 @@ export class SubmissionsService {
       workbookQuestionId: question.workbook_question_id,
       questionId: question.question_id,
       sequence: question.sequence,
-      points: question.points,
+      points: Number(question.points),
       isRequired: question.is_required,
       type: question.question_type,
       content: question.question_content,
@@ -807,8 +807,8 @@ export class SubmissionsService {
       attemptNo: row.attempt_no,
       status: row.status,
       score: Number(row.score),
-      earnedPoints: row.earned_points,
-      totalPoints: row.total_points,
+      earnedPoints: Number(row.earned_points),
+      totalPoints: Number(row.total_points),
       correctCount: row.correct_count,
       wrongCount: row.wrong_count,
       totalQuestions: row.total_questions,
@@ -848,7 +848,7 @@ export class SubmissionsService {
       correctChoiceId: answer.correct_choice_id,
       correctChoiceText: answer.correct_choice_text,
       isCorrect: answer.is_correct,
-      earnedPoints: answer.earned_points,
+      earnedPoints: Number(answer.earned_points),
       gradedAt: answer.graded_at?.toISOString() ?? null,
     };
   }

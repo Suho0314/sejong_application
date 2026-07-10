@@ -549,7 +549,7 @@ export class WorkbooksService {
       id: row.id,
       questionId: row.question_id,
       sequence: row.sequence,
-      points: row.points,
+      points: Number(row.points),
       isRequired: row.is_required,
       ...(row.question_type && row.question_content
         ? {

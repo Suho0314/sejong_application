@@ -586,8 +586,8 @@ export class ScoresService {
       attemptNo: row.attempt_no,
       status: row.status,
       score: Number(row.score),
-      totalPoints: row.total_points,
-      earnedPoints: row.earned_points,
+      totalPoints: Number(row.total_points),
+      earnedPoints: Number(row.earned_points),
       correctCount: row.correct_count,
       wrongCount: row.wrong_count,
       totalQuestions: row.total_questions,
@@ -616,7 +616,7 @@ export class ScoresService {
       correctChoiceId: answer.correct_choice_id,
       correctAnswer: answer.correct_choice_text,
       isCorrect: answer.is_correct,
-      earnedPoints: answer.earned_points,
+      earnedPoints: Number(answer.earned_points),
       gradedAt: answer.graded_at?.toISOString() ?? null,
     };
   }
